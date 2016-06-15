@@ -21,7 +21,7 @@ public:
                 const style::UpdateParameters&,
                 mapbox::geojsonvt::GeoJSONVT&);
 
-    void setNecessity(Necessity) final;
+    void setNecessity(Necessity) final {};
 };
 
 } // namespace mbgl
