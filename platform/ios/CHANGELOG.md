@@ -34,6 +34,7 @@ Mapbox welcomes participation and contributions from everyone.  Please read [CON
 - Deprecated `-[MGLMapView emptyMemoryCache]`. ([#4725](https://github.com/mapbox/mapbox-gl-native/pull/4725))
 - Added `MGLCoordinateInCoordinateBounds()`, a function that tests whether or not a coordinate is in a given bounds. ([#5053](https://github.com/mapbox/mapbox-gl-native/pull/5053))
 - Added a new option to `MGLMapDebugMaskOptions`, `MGLMapDebugWireframesMask`, that shows wireframes instead of the usual rendered output. ([#4359](https://github.com/mapbox/mapbox-gl-native/pull/4359))
+- Telemetry is now disabled when Low Power Mode is enabled. ([#5369](https://github.com/mapbox/mapbox-gl-native/pull/5369))
 
 ## 3.2.3
 

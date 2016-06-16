@@ -203,6 +203,10 @@ const NSTimeInterval MGLFlushInterval = 180;
        
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:UIApplicationDidEnterBackgroundNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:UIApplicationWillEnterForegroundNotification object:nil];
+
+        if (&NSProcessInfoPowerStateDidChangeNotification != NULL) {
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:NSProcessInfoPowerStateDidChangeNotification object:nil];
+        }
     }
     return self;
 }
@@ -252,9 +256,13 @@ const NSTimeInterval MGLFlushInterval = 180;
         [self pauseMetricsCollection];
         return;
     }
+
+    if ([self isLowPowerModeEnabled]) {
+        [self pauseMetricsCollection];
+        return;
+    }
     
     // Toggle pause based on current pause state and current settings state
-    // Practically, a pause only occurs because of a change to an NSUserDefaultsDidChangeNotification
     BOOL enabledInSettings = [[self class] isEnabled];
     if (self.paused && enabledInSettings) {
         [self resumeMetricsCollection];
@@ -278,14 +286,22 @@ const NSTimeInterval MGLFlushInterval = 180;
 }
 
 - (void)resumeMetricsCollection {
-    if (!self.paused || ![[self class] isEnabled]) {
+    if (!self.paused || ![[self class] isEnabled] || [self isLowPowerModeEnabled]) {
         return;
     }
-    
+
     self.paused = NO;
     self.data = [[MGLMapboxEventsData alloc] init];
     
     [self.locationManager startUpdatingLocation];
+}
+
+- (BOOL)isLowPowerModeEnabled {
+    if ([NSProcessInfo instancesRespondToSelector:@selector(isLowPowerModeEnabled)]) {
+        return [[NSProcessInfo processInfo] isLowPowerModeEnabled];
+    } else {
+        return NO;
+    }
 }
 
 + (void)flush {
