@@ -75,8 +75,25 @@ TEST(Annotations, StyleSourcedShapeAnnotation) {
     Polygon<double> polygon = {{ {{ { 0, 0 }, { 0, 45 }, { 45, 45 }, { 45, 0 } }} }};
 
     test.map.setStyleJSON(util::read_file("test/fixtures/api/annotation.json"));
-    test.map.addAnnotation(StyleSourcedAnnotation { polygon, "annotation" });
-    test.checkRendering("style_sourced_shape_annotation");
+    test.map.addAnnotation(StyleSourcedAnnotation { std::move(polygon), "annotation-fill" });
+    test.checkRendering("style_sourced_shape_annotation_fill");
+}
+
+TEST(Annotations, StyleSourcedShapeAnnotation2) {
+    AnnotationTest test;
+
+    LinearRing<double> linearRing;
+    linearRing.emplace_back(Point<double>{ 0, 0 });
+    linearRing.emplace_back(Point<double>{ 0, 45 });
+    linearRing.emplace_back(Point<double>{ 45, 45 });
+    linearRing.emplace_back(Point<double>{ 45, 0 });
+
+    Polygon<double> polygon;
+    polygon.push_back(std::move(linearRing));
+
+    test.map.setStyleJSON(util::read_file("test/fixtures/api/annotation.json"));
+    test.map.addAnnotation(StyleSourcedAnnotation { std::move(polygon), "annotation-line" });
+    test.checkRendering("style_sourced_shape_annotation_line");
 }
 
 TEST(Annotations, AddMultiple) {

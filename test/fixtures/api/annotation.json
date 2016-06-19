@@ -7,7 +7,7 @@
     }
   },
   "layers": [{
-    "id": "annotation",
+    "id": "annotation-fill",
     "type": "fill",
     "source": "fake",
     "source-layer": "fake",
@@ -16,6 +16,17 @@
     },
     "paint": {
       "fill-color": "rgba(255,0,0,1)"
+    }
+  },{
+    "id": "annotation-line",
+    "type": "line",
+    "source": "fake",
+    "source-layer": "fake",
+    "layout": {
+      "visibility": "none"
+    },
+    "paint": {
+      "line-color": "rgba(255,0,0,1)"
     }
   }]
 }
