@@ -344,7 +344,7 @@ final class NativeMapView {
     }
 
     public long addMarker(Marker marker) {
-        Marker[] markers = { marker };
+        Marker[] markers = {marker};
         return nativeAddMarkers(mNativeMapViewPtr, markers)[0];
     }
 
@@ -353,7 +353,7 @@ final class NativeMapView {
     }
 
     public long addPolyline(Polyline polyline) {
-        Polyline[] polylines = { polyline };
+        Polyline[] polylines = {polyline};
         return nativeAddPolylines(mNativeMapViewPtr, polylines)[0];
     }
 
@@ -362,7 +362,7 @@ final class NativeMapView {
     }
 
     public long addPolygon(Polygon polygon) {
-        Polygon[] polygons = { polygon };
+        Polygon[] polygons = {polygon};
         return nativeAddPolygons(mNativeMapViewPtr, polygons)[0];
     }
 
@@ -377,7 +377,7 @@ final class NativeMapView {
     }
 
     public void removeAnnotation(long id) {
-        long[] ids = { id };
+        long[] ids = {id};
         removeAnnotations(ids);
     }
 
@@ -434,7 +434,7 @@ final class NativeMapView {
     }
 
     public PointF pixelForLatLng(LatLng latLng) {
-        return nativePixelForLatLng(mNativeMapViewPtr, latLng);
+        return nativePixelForLatLng(mNativeMapViewPtr, latLng.getLatitude(), latLng.getLongitude());
     }
 
     public LatLng latLngForPixel(PointF pixel) {
@@ -627,7 +627,7 @@ final class NativeMapView {
 
     private native LatLng nativeLatLngForProjectedMeters(long nativeMapViewPtr, ProjectedMeters projectedMeters);
 
-    private native PointF nativePixelForLatLng(long nativeMapViewPtr, LatLng latLng);
+    private native PointF nativePixelForLatLng(long nativeMapViewPtr, double lat, double lon);
 
     private native LatLng nativeLatLngForPixel(long nativeMapViewPtr, PointF pixel);
 

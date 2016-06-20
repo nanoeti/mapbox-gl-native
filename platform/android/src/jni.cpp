@@ -974,13 +974,10 @@ jni::jobject* nativeLatLngForProjectedMeters(JNIEnv *env, jni::jobject* obj, jlo
     return &jni::NewObject(*env, *latLngClass, *latLngConstructorId, latLng.latitude, latLng.longitude);
 }
 
-jni::jobject* nativePixelForLatLng(JNIEnv *env, jni::jobject* obj, jlong nativeMapViewPtr, jni::jobject* latLng) {
+jni::jobject* nativePixelForLatLng(JNIEnv *env, jni::jobject* obj, jlong nativeMapViewPtr, jdouble latitude, jdouble longitude) {
     mbgl::Log::Debug(mbgl::Event::JNI, "nativePixelForLatLng");
     assert(nativeMapViewPtr != 0);
     NativeMapView *nativeMapView = reinterpret_cast<NativeMapView *>(nativeMapViewPtr);
-
-    jdouble latitude = jni::GetField<jdouble>(*env, latLng, *latLngLatitudeId);
-    jdouble longitude = jni::GetField<jdouble>(*env, latLng, *latLngLongitudeId);
 
     mbgl::ScreenCoordinate pixel = nativeMapView->getMap().pixelForLatLng(mbgl::LatLng(latitude, longitude));
     return &jni::NewObject(*env, *pointFClass, *pointFConstructorId, static_cast<jfloat>(pixel.x), static_cast<jfloat>(pixel.y));
@@ -1716,7 +1713,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved) {
         MAKE_NATIVE_METHOD(nativeGetMetersPerPixelAtLatitude, "(JDD)D"),
         MAKE_NATIVE_METHOD(nativeProjectedMetersForLatLng, "(JLcom/mapbox/mapboxsdk/geometry/LatLng;)Lcom/mapbox/mapboxsdk/geometry/ProjectedMeters;"),
         MAKE_NATIVE_METHOD(nativeLatLngForProjectedMeters, "(JLcom/mapbox/mapboxsdk/geometry/ProjectedMeters;)Lcom/mapbox/mapboxsdk/geometry/LatLng;"),
-        MAKE_NATIVE_METHOD(nativePixelForLatLng, "(JLcom/mapbox/mapboxsdk/geometry/LatLng;)Landroid/graphics/PointF;"),
+        MAKE_NATIVE_METHOD(nativePixelForLatLng, "(JDD)Landroid/graphics/PointF;"),
         MAKE_NATIVE_METHOD(nativeLatLngForPixel, "(JLandroid/graphics/PointF;)Lcom/mapbox/mapboxsdk/geometry/LatLng;"),
         MAKE_NATIVE_METHOD(nativeGetTopOffsetPixelsForAnnotationSymbol, "(JLjava/lang/String;)D"),
         MAKE_NATIVE_METHOD(nativeJumpTo, "(JDLcom/mapbox/mapboxsdk/geometry/LatLng;DD)V"),
