@@ -6,13 +6,16 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
 import com.mapbox.mapboxsdk.telemetry.TelemetryLocationReceiver;
-import com.mapzen.android.lost.api.LocationRequest;
-import com.mapzen.android.lost.api.LostApiClient;
+
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.common.api.GoogleApiClient;
 
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -28,18 +31,20 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * Do not unregister in Activity.onSaveInstanceState(), because this won't be called if the user moves back in the history stack.
  * </p>
  */
-public class LocationServices implements com.mapzen.android.lost.api.LocationListener {
+public class LocationServices implements com.google.android.gms.location.LocationListener,
+        GoogleApiClient.ConnectionCallbacks {
 
     private static final String TAG = "LocationServices";
 
     private static LocationServices instance;
 
     private Context context;
-    private LostApiClient locationClient;
+    private GoogleApiClient locationClient;
     private Location lastLocation;
 
     private CopyOnWriteArrayList<LocationListener> locationListeners;
 
+    private boolean mEnableGps;
     private boolean isGPSEnabled;
 
     /**
@@ -49,7 +54,9 @@ public class LocationServices implements com.mapzen.android.lost.api.LocationLis
         super();
         this.context = context;
         // Setup location services
-        locationClient = new LostApiClient.Builder(context).build();
+        locationClient = new GoogleApiClient.Builder(context)
+                .addApi(com.google.android.gms.location.LocationServices.API)
+                .addConnectionCallbacks(this).build();
         locationListeners = new CopyOnWriteArrayList<>();
     }
 
@@ -80,38 +87,13 @@ public class LocationServices implements com.mapzen.android.lost.api.LocationLis
         // Disconnect
         if (locationClient.isConnected()) {
             // Disconnect first to ensure that the new requests are GPS
-            com.mapzen.android.lost.api.LocationServices.FusedLocationApi.removeLocationUpdates(this);
+            com.google.android.gms.location.LocationServices.FusedLocationApi.removeLocationUpdates(locationClient, this);
             locationClient.disconnect();
         }
 
         // Setup Fresh
+        mEnableGps = enableGPS;
         locationClient.connect();
-        Location lastLocation = com.mapzen.android.lost.api.LocationServices.FusedLocationApi.getLastLocation();
-        if (lastLocation != null) {
-            this.lastLocation = lastLocation;
-        }
-
-        LocationRequest locationRequest;
-
-        if (enableGPS) {
-            // LocationRequest Tuned for GPS
-            locationRequest = LocationRequest.create()
-                    .setFastestInterval(1000)
-                    .setSmallestDisplacement(3.0f)
-                    .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-
-            com.mapzen.android.lost.api.LocationServices.FusedLocationApi.requestLocationUpdates(locationRequest, this);
-        } else {
-            // LocationRequest Tuned for PASSIVE
-            locationRequest = LocationRequest.create()
-                    .setFastestInterval(1000)
-                    .setSmallestDisplacement(3.0f)
-                    .setPriority(LocationRequest.PRIORITY_NO_POWER);
-
-            com.mapzen.android.lost.api.LocationServices.FusedLocationApi.requestLocationUpdates(locationRequest, this);
-        }
-
-        isGPSEnabled = enableGPS;
     }
 
     /**
@@ -185,5 +167,40 @@ public class LocationServices implements com.mapzen.android.lost.api.LocationLis
             return false;
         }
         return true;
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Location lastLocation = com.google.android.gms.location.LocationServices.FusedLocationApi.getLastLocation(locationClient);
+        if (lastLocation != null) {
+            this.lastLocation = lastLocation;
+        }
+
+        LocationRequest locationRequest;
+
+        if (mEnableGps) {
+            // LocationRequest Tuned for GPS
+            locationRequest = LocationRequest.create()
+                    .setFastestInterval(1000)
+                    .setSmallestDisplacement(3.0f)
+                    .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+            com.google.android.gms.location.LocationServices.FusedLocationApi.requestLocationUpdates(locationClient, locationRequest, this);
+        } else {
+            // LocationRequest Tuned for PASSIVE
+            locationRequest = LocationRequest.create()
+                    .setFastestInterval(1000)
+                    .setSmallestDisplacement(3.0f)
+                    .setPriority(LocationRequest.PRIORITY_NO_POWER);
+
+            com.google.android.gms.location.LocationServices.FusedLocationApi.requestLocationUpdates(locationClient, locationRequest, this);
+        }
+
+        isGPSEnabled = mEnableGps;
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
     }
 }
