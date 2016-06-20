@@ -978,19 +978,14 @@ jni::jobject* nativePixelForLatLng(JNIEnv *env, jni::jobject* obj, jlong nativeM
     mbgl::Log::Debug(mbgl::Event::JNI, "nativePixelForLatLng");
     assert(nativeMapViewPtr != 0);
     NativeMapView *nativeMapView = reinterpret_cast<NativeMapView *>(nativeMapViewPtr);
-
     mbgl::ScreenCoordinate pixel = nativeMapView->getMap().pixelForLatLng(mbgl::LatLng(latitude, longitude));
     return &jni::NewObject(*env, *pointFClass, *pointFConstructorId, static_cast<jfloat>(pixel.x), static_cast<jfloat>(pixel.y));
 }
 
-jni::jobject* nativeLatLngForPixel(JNIEnv *env, jni::jobject* obj, jlong nativeMapViewPtr, jni::jobject* pixel) {
+jni::jobject* nativeLatLngForPixel(JNIEnv *env, jni::jobject* obj, jlong nativeMapViewPtr, jfloat x, jfloat y) {
     mbgl::Log::Debug(mbgl::Event::JNI, "nativeLatLngForPixel");
     assert(nativeMapViewPtr != 0);
     NativeMapView *nativeMapView = reinterpret_cast<NativeMapView *>(nativeMapViewPtr);
-
-    jfloat x = jni::GetField<jfloat>(*env, pixel, *pointFXId);
-    jfloat y = jni::GetField<jfloat>(*env, pixel, *pointFYId);
-
     mbgl::LatLng latLng = nativeMapView->getMap().latLngForPixel(mbgl::ScreenCoordinate(x, y));
     return &jni::NewObject(*env, *latLngClass, *latLngConstructorId, latLng.latitude, latLng.longitude);
 }
