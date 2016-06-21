@@ -48,7 +48,6 @@ public class MyLocationDrawableActivity extends AppCompatActivity implements Loc
         location = LocationServices.getLocationServices(this).getLastLocation();
 
         MapboxMapOptions mapboxMapOptions = new MapboxMapOptions();
-        mapboxMapOptions.accessToken(getString(R.string.mapbox_access_token));
         mapboxMapOptions.styleUrl(Style.MAPBOX_STREETS);
         mapboxMapOptions.locationEnabled(true);
         mapboxMapOptions.camera(new CameraPosition.Builder()

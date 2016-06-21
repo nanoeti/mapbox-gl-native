@@ -11,9 +11,7 @@ import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import com.mapbox.mapboxsdk.MapboxAccountManager;
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
-import com.mapbox.mapboxsdk.exceptions.InvalidAccessTokenException;
 
 /**
  * Support Fragment wrapper around a map view.
@@ -76,55 +74,7 @@ public class SupportMapFragment extends Fragment {
             options = bundle.getParcelable(MapboxConstants.FRAG_ARG_MAPBOXMAPOPTIONS);
         }
 
-        // Assign an AccessToken if needed
-        if (options == null || options.getAccessToken() == null) {
-            String token = null;
-            if (MapboxAccountManager.getInstance() != null) {
-                token = MapboxAccountManager.getInstance().getAccessToken();
-            } else {
-                token = getToken(inflater.getContext());
-            }
-            if (TextUtils.isEmpty(token)) {
-                throw new InvalidAccessTokenException();
-            }
-            if (options == null) {
-                options = new MapboxMapOptions().accessToken(token);
-            } else {
-                options.accessToken(token);
-            }
-        }
         return mMap = new MapView(inflater.getContext(), options);
-    }
-
-    /**
-     * <p>
-     * Returns the Mapbox access token set in the app resources.
-     * </p>
-     * It will first search the application manifest for a {@link MapboxConstants#KEY_META_DATA_MANIFEST}
-     * meta-data value. If not found it will then attempt to load the access token from the
-     * {@code res/raw/token.txt} development file.
-     *
-     * @param context The {@link Context} of the {@link android.app.Activity} or {@link android.app.Fragment}.
-     * @return The Mapbox access token or null if not found.
-     * @see MapboxConstants#KEY_META_DATA_MANIFEST
-     * @deprecated As of release 4.1.0, replaced by {@link com.mapbox.mapboxsdk.MapboxAccountManager#start(Context, String)}
-     */
-    @Deprecated
-    private String getToken(@NonNull Context context) {
-        try {
-            // read out AndroidManifest
-            PackageManager packageManager = context.getPackageManager();
-            ApplicationInfo appInfo = packageManager.getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
-            String token = appInfo.metaData.getString(MapboxConstants.KEY_META_DATA_MANIFEST);
-            if (token == null || token.isEmpty()) {
-                throw new IllegalArgumentException();
-            }
-            return token;
-        } catch (Exception e) {
-            // use fallback on string resource, used for development
-            int tokenResId = context.getResources().getIdentifier("mapbox_access_token", "string", context.getPackageName());
-            return tokenResId != 0 ? context.getString(tokenResId) : null;
-        }
     }
 
     /**

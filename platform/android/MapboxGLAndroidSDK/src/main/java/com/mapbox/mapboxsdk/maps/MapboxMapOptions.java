@@ -72,8 +72,6 @@ public class MapboxMapOptions implements Parcelable {
     private int myLocationAccuracyAlpha;
 
     private String style;
-    @Deprecated
-    private String accessToken;
 
     /**
      * Creates a new MapboxMapOptions object.
@@ -118,7 +116,6 @@ public class MapboxMapOptions implements Parcelable {
         myLocationAccuracyTintColor = in.readInt();
 
         style = in.readString();
-        accessToken = in.readString();
     }
 
     /**
@@ -137,7 +134,6 @@ public class MapboxMapOptions implements Parcelable {
 
             mapboxMapOptions.camera(new CameraPosition.Builder(typedArray).build());
 
-            mapboxMapOptions.accessToken(typedArray.getString(R.styleable.MapView_access_token));
             mapboxMapOptions.styleUrl(typedArray.getString(R.styleable.MapView_style_url));
 
             mapboxMapOptions.zoomGesturesEnabled(typedArray.getBoolean(R.styleable.MapView_zoom_enabled, true));
@@ -212,21 +208,6 @@ public class MapboxMapOptions implements Parcelable {
      */
     public MapboxMapOptions camera(CameraPosition cameraPosition) {
         this.cameraPosition = cameraPosition;
-        return this;
-    }
-
-    /**
-     * <p>
-     * DEPRECATED @see MapboxAccountManager#start(String)
-     * </p>
-     * Specifies the accesstoken associated with a map view.
-     *
-     * @param accessToken Token to be used to access the service
-     * @return This
-     */
-    @Deprecated
-    public MapboxMapOptions accessToken(String accessToken) {
-        this.accessToken = accessToken;
         return this;
     }
 
@@ -608,19 +589,6 @@ public class MapboxMapOptions implements Parcelable {
     }
 
     /**
-     * <p>
-     * DEPRECATED @see MapboxAccountManager#start(String)
-     * </p>
-     * Get the current configured access token for a map view.
-     *
-     * @return Access token to be used.
-     */
-    @Deprecated
-    public String getAccessToken() {
-        return accessToken;
-    }
-
-    /**
      * Get the current configured style url for a map view.
      *
      * @return Style url to be used.
@@ -834,7 +802,6 @@ public class MapboxMapOptions implements Parcelable {
         dest.writeInt(myLocationAccuracyTintColor);
 
         dest.writeString(style);
-        dest.writeString(accessToken);
     }
 
     @Override
@@ -876,8 +843,7 @@ public class MapboxMapOptions implements Parcelable {
             return false;
         if (!Arrays.equals(myLocationBackgroundPadding, options.myLocationBackgroundPadding))
             return false;
-        if (style != null ? !style.equals(options.style) : options.style != null) return false;
-        return accessToken != null ? accessToken.equals(options.accessToken) : options.accessToken == null;
+        return style != null ? style.equals(options.style) : options.style == null;
     }
 
     @Override
@@ -910,7 +876,6 @@ public class MapboxMapOptions implements Parcelable {
         result = 31 * result + myLocationAccuracyTintColor;
         result = 31 * result + myLocationAccuracyAlpha;
         result = 31 * result + (style != null ? style.hashCode() : 0);
-        result = 31 * result + (accessToken != null ? accessToken.hashCode() : 0);
         return result;
     }
 }

@@ -12,7 +12,7 @@ import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
-import com.mapbox.mapboxsdk.telemetry.TelemetryLocationReceiver;
+//import com.mapbox.mapboxsdk.telemetry.TelemetryLocationReceiver;
 
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -120,10 +120,10 @@ public class LocationServices implements com.google.android.gms.location.Locatio
             listener.onLocationChanged(location);
         }
 
-        // Update the Telemetry Receiver
-        Intent locIntent = new Intent(TelemetryLocationReceiver.INTENT_STRING);
-        locIntent.putExtra(LocationManager.KEY_LOCATION_CHANGED, location);
-        context.sendBroadcast(locIntent);
+//        // Update the Telemetry Receiver
+//        Intent locIntent = new Intent(TelemetryLocationReceiver.INTENT_STRING);
+//        locIntent.putExtra(LocationManager.KEY_LOCATION_CHANGED, location);
+//        context.sendBroadcast(locIntent);
     }
 
     /**
