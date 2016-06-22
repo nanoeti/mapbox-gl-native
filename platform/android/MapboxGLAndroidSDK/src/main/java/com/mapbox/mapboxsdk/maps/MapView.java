@@ -1095,6 +1095,7 @@ public class MapView extends FrameLayout {
         }
         mNativeMapView.cancelTransitions();
         mNativeMapView.jumpTo(bearing, center, pitch, zoom);
+        mMyLocationView.setTilt(pitch);
     }
 
     void easeTo(double bearing, LatLng center, long duration, double pitch, double zoom, boolean easingInterpolator, @Nullable final MapboxMap.CancelableCallback cancelableCallback) {
@@ -1143,6 +1144,7 @@ public class MapView extends FrameLayout {
         }
 
         mNativeMapView.flyTo(bearing, center, duration, pitch, zoom);
+        mMyLocationView.setTilt(pitch);
     }
 
     private void adjustTopOffsetPixels() {

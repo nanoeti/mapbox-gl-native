@@ -245,8 +245,10 @@ public class MyLocationView extends View {
         final PointF pointF = screenLocation;
 
         float metersPerPixel = (float) projection.getMetersPerPixelAtLatitude(location.getLatitude());
-        float accuracyPixels = (Float) accuracyAnimator.getAnimatedValue() / metersPerPixel / 2;
-        float maxRadius = getWidth() / 2;
+        float accuracyPixels = (Float) accuracyAnimator.getAnimatedValue() / metersPerPixel;
+        float width = getWidth();
+        float height = getHeight();
+        float maxRadius = (float) Math.sqrt(width * width + height * height);
         accuracyPixels = accuracyPixels <= maxRadius ? accuracyPixels : maxRadius;
 
         // put matrix in origin
@@ -620,7 +622,7 @@ public class MyLocationView extends View {
                 accuracyAnimator.end();
             }
 
-            accuracyAnimator = ValueAnimator.ofFloat(accuracy * 10, location.getAccuracy() * 10);
+            accuracyAnimator = ValueAnimator.ofFloat(accuracy, location.getAccuracy());
             accuracyAnimator.setDuration(750);
             accuracyAnimator.start();
             accuracy = location.getAccuracy();
@@ -702,10 +704,11 @@ public class MyLocationView extends View {
 
             // update LatLng location
             previousLocation = latLng;
-            latLng = new LatLng(location);
+//            latLng = new LatLng(location);
 
             // update LatLng direction
             if (location.hasBearing()) {
+                gpsDirection = clamp(location.getBearing() - (float) mapboxMap.getCameraPosition().bearing);
                 gpsDirection = clamp(location.getBearing() - (float) mapboxMap.getCameraPosition().bearing);
                 setCompass(gpsDirection);
             }
@@ -718,8 +721,13 @@ public class MyLocationView extends View {
             locationUpdateTimestamp = SystemClock.elapsedRealtime();
             long locationUpdateDuration = (long) ((locationUpdateTimestamp - previousUpdateTimeStamp) * 1.3);
 
+            // Limit animation to 5 seconds
+            if (locationUpdateDuration > 5000) {
+                locationUpdateDuration = 5000;
+            }
+
             // calculate interpolated entity
-            interpolatedLocation = new LatLng((latLng.getLatitude() + previousLocation.getLatitude()) / 2, (latLng.getLongitude() + previousLocation.getLongitude()) / 2);
+//            interpolatedLocation = new LatLng((latLng.getLatitude() + previousLocation.getLatitude()) / 2, (latLng.getLongitude() + previousLocation.getLongitude()) / 2);
 
             // animate changes
             if (locationChangeAnimator != null) {
@@ -727,15 +735,17 @@ public class MyLocationView extends View {
                 locationChangeAnimator = null;
             }
 
+            LatLng newLatLng = new LatLng(location);
+
             locationChangeAnimator = ValueAnimator.ofFloat(0.0f, 1.0f);
             locationChangeAnimator.setDuration((long) (locationUpdateDuration * 1.2));
             locationChangeAnimator.addUpdateListener(new MarkerCoordinateAnimatorListener(this,
-                    previousLocation, interpolatedLocation
+                    previousLocation, newLatLng
             ));
             locationChangeAnimator.start();
 
             // use interpolated location as current location
-            latLng = interpolatedLocation;
+//            latLng = interpolatedLocation;
         }
 
         private float clamp(float direction) {
