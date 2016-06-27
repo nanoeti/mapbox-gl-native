@@ -1622,7 +1622,12 @@ public class MapView extends FrameLayout {
     // This class handles two finger gestures and double-tap drag gestures
     private class ScaleGestureListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
 
+        static final float VELOCITY_THRESHOLD = 0.15f;
+
         long mBeginTime = 0;
+        long mPreviousTime = 0;
+        long mTimeDelta = 0;
+        float mPreviousScaleFactor = 1.0f;
         float mScaleFactor = 1.0f;
 
         // Called when two fingers first touch the screen
@@ -1636,13 +1641,58 @@ public class MapView extends FrameLayout {
             resetTrackingModesIfRequired();
 
             mBeginTime = detector.getEventTime();
+            mPreviousTime = mBeginTime;
             return true;
         }
 
         // Called when fingers leave screen
         @Override
         public void onScaleEnd(ScaleGestureDetector detector) {
+
+            double velocity = Math.pow(mPreviousScaleFactor, 1000.0 / mTimeDelta);
+
+            if (Math.abs(velocity - 1) > VELOCITY_THRESHOLD) {
+
+                UiSettings uiSettings = mMapboxMap.getUiSettings();
+
+                float ease = 0.25f;
+
+                velocity = Math.pow(velocity, ease);
+                double speed = Math.abs(velocity);
+                double deceleration = 2500;
+                double duration = Math.pow(speed, 1 / (deceleration * ease));
+
+                mNativeMapView.cancelTransitions();
+
+                TrackingSettings trackingSettings = mMapboxMap.getTrackingSettings();
+
+                // Scale the map
+                if (uiSettings.isScrollGesturesEnabled() && !mQuickZoom && trackingSettings.isLocationTrackingDisabled()) {
+                    // around gesture
+                    mNativeMapView.scaleBy(Math.pow(velocity, duration / 2),
+                            detector.getFocusX() / mScreenDensity,
+                            detector.getFocusY() / mScreenDensity,
+                            (long) (duration * 1000.0f));
+                } else {
+                    if (trackingSettings.isLocationTrackingDisabled()) {
+                        // around center map
+                        mNativeMapView.scaleBy(Math.pow(velocity, duration / 2),
+                                (getWidth() / 2) / mScreenDensity, (getHeight() / 2) / mScreenDensity,
+                                (long) (duration * 1000.0f));
+                    } else {
+                        // around user location view
+                        float x = mMyLocationView.getX() + mMyLocationView.getWidth() / 2;
+                        float y = mMyLocationView.getY() + mMyLocationView.getHeight() / 2;
+                        mNativeMapView.scaleBy(Math.pow(velocity, duration / 2), x / mScreenDensity,
+                                y / mScreenDensity, (long) (duration * 1000.0f));
+                    }
+                }
+            }
+
             mBeginTime = 0;
+            mPreviousTime = 0;
+            mTimeDelta = 0;
+            mPreviousScaleFactor = 1.0f;
             mScaleFactor = 1.0f;
             mZoomStarted = false;
         }
@@ -1673,6 +1723,11 @@ public class MapView extends FrameLayout {
             if (!mZoomStarted) {
                 return false;
             }
+
+            long currentTime = detector.getEventTime();
+            mTimeDelta = currentTime - mPreviousTime;
+            mPreviousTime = currentTime;
+            mPreviousScaleFactor = detector.getScaleFactor();
 
             // Cancel any animation
             mNativeMapView.cancelTransitions();
