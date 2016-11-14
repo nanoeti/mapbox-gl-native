@@ -3,12 +3,12 @@ package com.mapbox.mapboxsdk.http;
 
 import android.content.Context;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.text.TextUtils;
 import android.util.Log;
 
 import com.mapbox.mapboxsdk.BuildConfig;
-import com.mapbox.mapboxsdk.MapboxAccountManager;
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
 
 import java.io.IOException;
@@ -23,7 +23,6 @@ import javax.net.ssl.SSLException;
 
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -56,22 +55,6 @@ class HTTPRequest implements Callback {
         mNativePtr = nativePtr;
 
         try {
-            // Don't try a request if we aren't connected
-            if (!MapboxAccountManager.getInstance().isConnected()) {
-                throw new NoRouteToHostException("No Internet connection available.");
-            }
-
-            HttpUrl httpUrl = HttpUrl.parse(resourceUrl);
-            final String host = httpUrl.host().toLowerCase(MapboxConstants.MAPBOX_LOCALE);
-            if (host.equals("mapbox.com") || host.endsWith(".mapbox.com") || host.equals("mapbox.cn") || host.endsWith(".mapbox.cn")) {
-                if (httpUrl.querySize() == 0) {
-                    resourceUrl = resourceUrl + "?";
-                } else {
-                    resourceUrl = resourceUrl + "&";
-                }
-                resourceUrl = resourceUrl + "events=true";
-            }
-
             Request.Builder builder = new Request.Builder()
                     .url(resourceUrl)
                     .tag(resourceUrl.toLowerCase(MapboxConstants.MAPBOX_LOCALE))
@@ -192,12 +175,6 @@ class HTTPRequest implements Callback {
     }
 
     private String getApplicationIdentifier() {
-        try {
-            Context context = MapboxAccountManager.getInstance().getApplicationContext();
-            PackageInfo packageInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
-            return String.format("%s/%s (%s)", context.getPackageName(), packageInfo.versionName, packageInfo.versionCode);
-        } catch (Exception e) {
-            return "";
-        }
+        return "";
     }
 }
