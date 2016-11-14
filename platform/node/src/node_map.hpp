@@ -1,5 +1,7 @@
 #pragma once
 
+#include "node_thread_pool.hpp"
+
 #include <mbgl/map/map.hpp>
 #include <mbgl/storage/file_source.hpp>
 #include <mbgl/platform/default/headless_view.hpp>
@@ -10,8 +12,6 @@
 #include <nan.h>
 #pragma GCC diagnostic pop
 
-#include <queue>
-
 namespace node_mbgl {
 
 class NodeMap : public Nan::ObjectWrap,
@@ -20,32 +20,41 @@ public:
     struct RenderOptions;
     class RenderWorker;
 
-    static NAN_MODULE_INIT(Init);
+    NodeMap(v8::Local<v8::Object>);
+    ~NodeMap();
 
-    static NAN_METHOD(New);
-    static NAN_METHOD(Load);
-    static NAN_METHOD(Render);
-    static NAN_METHOD(Release);
-    static NAN_METHOD(DumpDebugLogs);
-    static NAN_METHOD(QueryRenderedFeatures);
+    static Nan::Persistent<v8::Function> constructor;
+
+    static void Init(v8::Local<v8::Object>);
+
+    static void New(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void Load(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void Loaded(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void Render(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void Release(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void AddClass(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void AddSource(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void AddLayer(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void RemoveLayer(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void SetLayoutProperty(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void SetPaintProperty(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void SetFilter(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void SetCenter(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void SetBearing(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void DumpDebugLogs(const Nan::FunctionCallbackInfo<v8::Value>&);
+    static void QueryRenderedFeatures(const Nan::FunctionCallbackInfo<v8::Value>&);
 
     void startRender(RenderOptions options);
     void renderFinished();
 
     void release();
 
-    inline bool isLoaded() { return loaded; }
-    inline bool isValid() { return valid; }
-
     static RenderOptions ParseOptions(v8::Local<v8::Object>);
-    static Nan::Persistent<v8::Function> constructor;
 
-    NodeMap(v8::Local<v8::Object>);
-    ~NodeMap();
-
-    std::unique_ptr<mbgl::AsyncRequest> request(const mbgl::Resource&, Callback);
+    std::unique_ptr<mbgl::AsyncRequest> request(const mbgl::Resource&, mbgl::FileSource::Callback);
 
     mbgl::HeadlessView view;
+    NodeThreadPool threadpool;
     std::unique_ptr<mbgl::Map> map;
 
     std::exception_ptr error;
@@ -56,7 +65,6 @@ public:
     uv_async_t *async;
 
     bool loaded = false;
-    bool valid = true;
 };
 
 }

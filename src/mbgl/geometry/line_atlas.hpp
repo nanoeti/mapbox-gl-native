@@ -1,12 +1,17 @@
 #pragma once
 
-#include <mbgl/gl/gl.hpp>
-#include <mbgl/gl/gl_object_store.hpp>
+#include <mbgl/gl/object.hpp>
+#include <mbgl/util/optional.hpp>
 
 #include <vector>
-#include <map>
+#include <unordered_map>
+#include <memory>
 
 namespace mbgl {
+
+namespace gl {
+class Context;
+} // namespace gl
 
 typedef struct {
     float width;
@@ -14,30 +19,35 @@ typedef struct {
     float y;
 } LinePatternPos;
 
+enum class LinePatternCap : bool {
+    Square = false,
+    Round = true,
+};
+
 class LineAtlas {
 public:
-    LineAtlas(GLsizei width, GLsizei height);
+    LineAtlas(uint16_t width, uint16_t height);
     ~LineAtlas();
 
     // Binds the atlas texture to the GPU, and uploads data if it is out of date.
-    void bind(gl::GLObjectStore&);
+    void bind(gl::Context&, gl::TextureUnit unit);
 
     // Uploads the texture to the GPU to be available when we need it. This is a lazy operation;
     // the texture is only bound when the data is out of date (=dirty).
-    void upload(gl::GLObjectStore&);
+    void upload(gl::Context&, gl::TextureUnit unit);
 
-    LinePatternPos getDashPosition(const std::vector<float>&, bool, gl::GLObjectStore&);
-    LinePatternPos addDash(const std::vector<float> &dasharray, bool round, gl::GLObjectStore&);
+    LinePatternPos getDashPosition(const std::vector<float>&, LinePatternCap);
+    LinePatternPos addDash(const std::vector<float>& dasharray, LinePatternCap);
 
-    const GLsizei width;
-    const GLsizei height;
+    const uint16_t width;
+    const uint16_t height;
 
 private:
-    const std::unique_ptr<GLbyte[]> data;
+    const std::unique_ptr<char[]> data;
     bool dirty;
-    gl::TextureHolder texture;
+    mbgl::optional<gl::UniqueTexture> texture;
     int nextRow = 0;
-    std::map<size_t, LinePatternPos> positions;
+    std::unordered_map<size_t, LinePatternPos> positions;
 };
 
 } // namespace mbgl

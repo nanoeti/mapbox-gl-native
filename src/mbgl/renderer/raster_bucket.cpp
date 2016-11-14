@@ -1,42 +1,47 @@
 #include <mbgl/renderer/raster_bucket.hpp>
-#include <mbgl/layer/raster_layer.hpp>
+#include <mbgl/style/layers/raster_layer.hpp>
 #include <mbgl/shader/raster_shader.hpp>
 #include <mbgl/renderer/painter.hpp>
+#include <mbgl/gl/gl.hpp>
+#include <mbgl/gl/context.hpp>
 
-using namespace mbgl;
+namespace mbgl {
 
-RasterBucket::RasterBucket(gl::TexturePool& texturePool)
-: raster(texturePool) {
+using namespace style;
+
+RasterBucket::RasterBucket(PremultipliedImage&& image_) : image(std::move(image_)) {
 }
 
-void RasterBucket::upload(gl::GLObjectStore& glObjectStore) {
-    if (hasData()) {
-        raster.upload(glObjectStore);
-        uploaded = true;
-    }
+void RasterBucket::upload(gl::Context& context) {
+    texture = context.createTexture(image);
+    image = {};
+    uploaded = true;
 }
 
 void RasterBucket::render(Painter& painter,
-                          const StyleLayer& layer,
-                          const UnwrappedTileID& tileID,
-                          const mat4& matrix) {
-    painter.renderRaster(*this, *layer.as<RasterLayer>(), tileID, matrix);
+                          PaintParameters& parameters,
+                          const Layer& layer,
+                          const RenderTile& tile) {
+    painter.renderRaster(parameters, *this, *layer.as<RasterLayer>(), tile);
 }
 
-void RasterBucket::setImage(PremultipliedImage image) {
-    raster.load(std::move(image));
-}
-
-void RasterBucket::drawRaster(RasterShader& shader, StaticVertexBuffer &vertices, VertexArrayObject &array, gl::GLObjectStore& glObjectStore) {
-    raster.bind(true, glObjectStore);
-    array.bind(shader, vertices, BUFFER_OFFSET_0, glObjectStore);
-    MBGL_CHECK_ERROR(glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertices.index()));
+void RasterBucket::drawRaster(RasterShader& shader,
+                              gl::VertexBuffer<RasterVertex>& vertices,
+                              gl::VertexArrayObject& array,
+                              gl::Context& context) {
+    assert(texture);
+    context.bindTexture(*texture, 0, gl::TextureFilter::Linear);
+    context.bindTexture(*texture, 1, gl::TextureFilter::Linear);
+    array.bind(shader, vertices, BUFFER_OFFSET_0, context);
+    MBGL_CHECK_ERROR(glDrawArrays(GL_TRIANGLE_STRIP, 0, static_cast<GLsizei>(vertices.vertexCount)));
 }
 
 bool RasterBucket::hasData() const {
-    return raster.isLoaded();
+    return true;
 }
 
 bool RasterBucket::needsClipping() const {
     return false;
 }
+
+} // namespace mbgl

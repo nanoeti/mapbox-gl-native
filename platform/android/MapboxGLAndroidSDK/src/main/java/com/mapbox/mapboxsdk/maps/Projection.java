@@ -15,10 +15,15 @@ import com.mapbox.mapboxsdk.geometry.VisibleRegion;
  */
 public class Projection {
 
-    private MapView mMapView;
+    private final MapView mapView;
+    private final float screenDensity;
+    private final PointF screenLocationPoint;
 
     Projection(@NonNull MapView mapView) {
-        this.mMapView = mapView;
+        this.mapView = mapView;
+        this.screenLocationPoint = new PointF();
+        this.screenDensity = mapView.getContext() != null ? /* return default if unit test */
+                mapView.getContext().getResources().getDisplayMetrics().density : 1.0f;
     }
 
     /**
@@ -31,8 +36,8 @@ public class Projection {
      * @param latitude The latitude for which to return the value.
      * @return The distance measured in meters.
      */
-    public double getMetersPerPixelAtLatitude(@FloatRange(from = -180, to = 180) double latitude) {
-        return mMapView.getMetersPerPixelAtLatitude(latitude);
+    public double getMetersPerPixelAtLatitude(@FloatRange(from = -90, to = 90) double latitude) {
+        return mapView.getMetersPerPixelAtLatitude(latitude);
     }
 
     /**
@@ -45,7 +50,8 @@ public class Projection {
      * the given screen point does not intersect the ground plane.
      */
     public LatLng fromScreenLocation(PointF point) {
-        return mMapView.fromScreenLocation(point);
+        screenLocationPoint.set(point.x / screenDensity, point.y / screenDensity);
+        return mapView.fromNativeScreenLocation(screenLocationPoint);
     }
 
     /**
@@ -57,10 +63,10 @@ public class Projection {
     public VisibleRegion getVisibleRegion() {
         LatLngBounds.Builder builder = new LatLngBounds.Builder();
 
-        float left = mMapView.getContentPaddingLeft();
-        float right = mMapView.getWidth() - mMapView.getContentPaddingRight();
-        float top = mMapView.getContentPaddingTop();
-        float bottom = mMapView.getHeight() - mMapView.getContentPaddingBottom();
+        float left = mapView.getContentPaddingLeft();
+        float right = mapView.getWidth() - mapView.getContentPaddingRight();
+        float top = mapView.getContentPaddingTop();
+        float bottom = mapView.getHeight() - mapView.getContentPaddingBottom();
 
         LatLng topLeft = fromScreenLocation(new PointF(left, top));
         LatLng topRight = fromScreenLocation(new PointF(right, top));
@@ -84,7 +90,9 @@ public class Projection {
      * @return A Point representing the screen location in screen pixels.
      */
     public PointF toScreenLocation(LatLng location) {
-        return mMapView.toScreenLocation(location);
+        PointF pointF = mapView.toNativeScreenLocation(location);
+        pointF.set(pointF.x * screenDensity, pointF.y * screenDensity);
+        return pointF;
     }
 
     /**
@@ -94,6 +102,6 @@ public class Projection {
      * @return zoom level that fits the MapView.
      */
     public double calculateZoom(float minScale) {
-        return Math.log(mMapView.getScale() * minScale) / Math.log(2);
+        return Math.log(mapView.getScale() * minScale) / Math.log(2);
     }
 }

@@ -24,6 +24,21 @@ public class MapboxConstants {
     public static final String KEY_META_DATA_STAGING_ACCESS_TOKEN = "com.mapbox.TestEventsAccessToken";
 
     /**
+     * Key used to switch storage to external in AndroidManifest.xml
+     */
+    public final static String KEY_META_DATA_SET_STORAGE_EXTERNAL = "com.mapbox.SetStorageExternal";
+
+    /**
+     * Default value for KEY_META_DATA_SET_STORAGE_EXTERNAL (default is internal storage)
+     */
+    public final static boolean DEFAULT_SET_STORAGE_EXTERNAL = false;
+
+    /**
+     * Unmeasured state
+     */
+    public final static float UNMEASURED = -1f;
+
+    /**
      * Default animation time
      */
     public static final int ANIMATION_DURATION = 300;
@@ -85,12 +100,15 @@ public class MapboxConstants {
     public static final String STATE_MY_LOCATION_ENABLED = "myLocationEnabled";
     public static final String STATE_MY_LOCATION_TRACKING_MODE = "myLocationTracking";
     public static final String STATE_MY_BEARING_TRACKING_MODE = "myBearingTracking";
+    public static final String STATE_MY_LOCATION_TRACKING_DISMISS = "myLocationTrackingDismiss";
+    public static final String STATE_MY_BEARING_TRACKING_DISMISS = "myBearingTrackingDismiss";
     public static final String STATE_COMPASS_ENABLED = "compassEnabled";
     public static final String STATE_COMPASS_GRAVITY = "compassGravity";
     public static final String STATE_COMPASS_MARGIN_LEFT = "compassMarginLeft";
     public static final String STATE_COMPASS_MARGIN_TOP = "compassMarginTop";
     public static final String STATE_COMPASS_MARGIN_RIGHT = "compassMarginRight";
     public static final String STATE_COMPASS_MARGIN_BOTTOM = "compassMarginBottom";
+    public static final String STATE_COMPASS_FADE_WHEN_FACING_NORTH = "compassFade";
     public static final String STATE_LOGO_GRAVITY = "logoGravity";
     public static final String STATE_LOGO_MARGIN_LEFT = "logoMarginLeft";
     public static final String STATE_LOGO_MARGIN_TOP = "logoMarginTop";
@@ -109,4 +127,6 @@ public class MapboxConstants {
     public static final String MAPBOX_SHARED_PREFERENCES_FILE = "MapboxSharedPreferences";
     public static final String MAPBOX_SHARED_PREFERENCE_KEY_VENDORID = "mapboxVendorId";
     public static final String MAPBOX_SHARED_PREFERENCE_KEY_TELEMETRY_ENABLED = "mapboxTelemetryEnabled";
+    public static final String MAPBOX_SHARED_PREFERENCE_KEY_TELEMETRY_STAGING_URL = "mapboxTelemetryStagingUrl";
+    public static final String MAPBOX_SHARED_PREFERENCE_KEY_TELEMETRY_STAGING_ACCESS_TOKEN = "mapboxTelemetryStagingAccessToken";
 }

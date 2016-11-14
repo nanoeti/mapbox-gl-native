@@ -8,16 +8,16 @@ Requires a modern C++ runtime that supports C++14.
 
 By default, installs binaries. On these platforms no additional dependencies are needed.
 
-- 64 bit OS X or 64 bit Linux
-- Node.js v4+
+- 64 bit macOS or 64 bit Linux
+- Node.js v4.x _(note: v5+ is known to have issues)_
 
-Just run:
+Run:
 
 ```
 npm install mapbox-gl-native
 ```
 
-Other platforms will fall back to a source compile with `make node`. To compile this module, make sure all submodules are initialized with `git submodule update --init` and install the [external dependencies required to build from source](https://github.com/mapbox/mapbox-gl-native/blob/node-v2.1.0/INSTALL.md#2-installing-dependencies).
+Other platforms will fall back to a source compile with `make node`; see INSTALL.md in the repository root directory for prequisites.
 
 ## Testing
 
@@ -29,13 +29,25 @@ npm run test-suite
 ## Rendering a map tile
 
 ```js
+var fs = require('fs');
+var path = require('path');
 var mbgl = require('mapbox-gl-native');
 var sharp = require('sharp');
-var map = new mbgl.Map({ request: function() {} });
+
+var options = {
+  request: function(req, callback) {
+    fs.readFile(path.join(__dirname, 'test', req.url), function(err, data) {
+      callback(err, { data: data });
+    });
+  },
+  ratio: 1
+};
+
+var map = new mbgl.Map(options);
 
 map.load(require('./test/fixtures/style.json'));
 
-map.render({}, function(err, buffer) {
+map.render({zoom: 0}, function(err, buffer) {
     if (err) throw err;
 
     map.release();

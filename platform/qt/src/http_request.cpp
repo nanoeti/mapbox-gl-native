@@ -3,6 +3,7 @@
 
 #include <mbgl/storage/response.hpp>
 #include <mbgl/util/chrono.hpp>
+#include <mbgl/util/optional.hpp>
 #include <mbgl/util/http_header.hpp>
 #include <mbgl/util/string.hpp>
 
@@ -39,7 +40,8 @@ QNetworkRequest HTTPRequest::networkRequest() const
     req.setRawHeader("User-Agent", "MapboxGL/1.0 [Qt]");
 
     if (m_resource.priorEtag) {
-        req.setRawHeader("If-None-Match", QByteArray(m_resource.priorEtag->data(), m_resource.priorEtag->size()));
+        const auto etag = m_resource.priorEtag;
+        req.setRawHeader("If-None-Match", QByteArray(etag->data(), etag->size()));
     } else if (m_resource.priorModified) {
         req.setRawHeader("If-Modified-Since", util::rfc1123(*m_resource.priorModified).c_str());
     }
@@ -67,6 +69,8 @@ void HTTPRequest::handleNetworkReply(QNetworkReply *reply)
     }
 
     QPair<QByteArray, QByteArray> line;
+    optional<std::string> retryAfter;
+    optional<std::string> xRateLimitReset;
     foreach(line, reply->rawHeaderPairs()) {
         QString header = QString(line.first).toLower();
 
@@ -78,6 +82,10 @@ void HTTPRequest::handleNetworkReply(QNetworkReply *reply)
             response.expires = http::CacheControl::parse(line.second.constData()).toTimePoint();
         } else if (header == "expires") {
             response.expires = util::parseTimestamp(line.second.constData());
+        } else if (header == "retry-after") {
+            retryAfter = std::string(line.second.constData(), line.second.size());
+        } else if (header == "x-rate-limit-reset") {
+            xRateLimitReset = std::string(line.second.constData(), line.second.size());
         }
     }
 
@@ -89,7 +97,7 @@ void HTTPRequest::handleNetworkReply(QNetworkReply *reply)
         if (bytes.isEmpty()) {
             response.data = std::make_shared<std::string>();
         } else {
-            response.data = std::make_shared<std::string>(bytes.data(), bytes.size());
+            response.data = std::make_shared<std::string>(bytes.constData(), bytes.size());
         }
         break;
     }
@@ -108,6 +116,11 @@ void HTTPRequest::handleNetworkReply(QNetworkReply *reply)
         }
         break;
     }
+    case 429:
+        response.error = std::make_unique<Error>(
+                Error::Reason::RateLimit, "HTTP status code 429", 
+                http::parseRetryHeaders(retryAfter, xRateLimitReset));
+        break;
     default:
         Response::Error::Reason reason = (responseCode >= 500 && responseCode < 600) ?
             Error::Reason::Server : Error::Reason::Other;

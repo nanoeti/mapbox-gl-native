@@ -41,22 +41,30 @@ import java.util.Random;
 
 public class MarkerViewActivity extends AppCompatActivity {
 
-    private MapboxMap mMapboxMap;
-    private MapView mMapView;
-
-    private MarkerView movingMarkerOne, movingMarkerTwo;
-    private Random randomAnimator = new Random();
-    private Handler locationUpdateHandler = new Handler();
-    private Runnable moveMarkerRunnable = new MoveMarkerRunnable();
-    private int rotation = 0;
-
-    private final static LatLng[] LAT_LNGS = new LatLng[]{
+    private static final LatLng[] LAT_LNGS = new LatLng[]{
             new LatLng(38.897424, -77.036508),
             new LatLng(38.909698, -77.029642),
             new LatLng(38.907227, -77.036530),
             new LatLng(38.905607, -77.031916),
-            new LatLng(38.889441, -77.050134)
+            new LatLng(38.889441, -77.050134),
+            new LatLng(38.888000, -77.050000) //Slight overlap to show re-ordering on selection
     };
+
+    private MapboxMap mapboxMap;
+    private MapView mapView;
+
+    // MarkerView location updates
+    private MarkerView movingMarkerOne;
+    private MarkerView movingMarkerTwo;
+    private Random randomAnimator = new Random();
+    private Handler locationUpdateHandler = new Handler();
+    private Runnable moveMarkerRunnable = new MoveMarkerRunnable();
+
+    // MarkerView rotate updates
+    private MarkerView rotateMarker;
+    private Handler rotateUpdateHandler = new Handler();
+    private Runnable rotateMarkerRunnable = new RotateMarkerRunnable();
+    private int rotation = 360;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,12 +81,12 @@ public class MarkerViewActivity extends AppCompatActivity {
         }
 
         final TextView viewCountView = (TextView) findViewById(R.id.countView);
-        mMapView = (MapView) findViewById(R.id.mapView);
-        mMapView.onCreate(savedInstanceState);
-        mMapView.getMapAsync(new OnMapReadyCallback() {
+        mapView = (MapView) findViewById(R.id.mapView);
+        mapView.onCreate(savedInstanceState);
+        mapView.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(@NonNull MapboxMap mapboxMap) {
-                mMapboxMap = mapboxMap;
+                MarkerViewActivity.this.mapboxMap = mapboxMap;
 
                 final MarkerViewManager markerViewManager = mapboxMap.getMarkerViewManager();
 
@@ -87,9 +95,10 @@ public class MarkerViewActivity extends AppCompatActivity {
 
                 // add default ViewMarker markers
                 for (int i = 0; i < LAT_LNGS.length; i++) {
-                    mMapboxMap.addMarker(new MarkerViewOptions()
+                    MarkerViewActivity.this.mapboxMap.addMarker(new MarkerViewOptions()
                             .position(LAT_LNGS[i])
                             .title(String.valueOf(i))
+                            .alpha(0.5f)
                             .icon(usFlag)
                     );
                 }
@@ -103,22 +112,25 @@ public class MarkerViewActivity extends AppCompatActivity {
                 options.flat(true);
                 mapboxMap.addMarker(options);
 
-                mMapboxMap.addMarker(new MarkerOptions()
+                MarkerViewActivity.this.mapboxMap.addMarker(new MarkerOptions()
                         .title("United States")
                         .position(new LatLng(38.902580, -77.050102))
                 );
 
-                mMapboxMap.addMarker(new TextMarkerViewOptions()
+                rotateMarker = MarkerViewActivity.this.mapboxMap.addMarker(new TextMarkerViewOptions()
                         .text("A")
+                        .rotation(rotation = 270)
                         .position(new LatLng(38.889876, -77.008849))
                 );
+                loopMarkerRotate();
 
-                mMapboxMap.addMarker(new TextMarkerViewOptions()
+
+                MarkerViewActivity.this.mapboxMap.addMarker(new TextMarkerViewOptions()
                         .text("B")
                         .position(new LatLng(38.907327, -77.041293))
                 );
 
-                mMapboxMap.addMarker(new TextMarkerViewOptions()
+                MarkerViewActivity.this.mapboxMap.addMarker(new TextMarkerViewOptions()
                         .text("C")
                         .position(new LatLng(38.897642, -77.041980))
                 );
@@ -129,19 +141,19 @@ public class MarkerViewActivity extends AppCompatActivity {
                 markerViewManager.addMarkerViewAdapter(new TextAdapter(MarkerViewActivity.this, mapboxMap));
 
                 // add a change listener to validate the size of amount of child views
-                mMapView.addOnMapChangedListener(new MapView.OnMapChangedListener() {
+                mapView.addOnMapChangedListener(new MapView.OnMapChangedListener() {
                     @Override
                     public void onMapChanged(@MapView.MapChange int change) {
                         if (change == MapView.REGION_IS_CHANGING || change == MapView.REGION_DID_CHANGE) {
                             if (!markerViewManager.getMarkerViewAdapters().isEmpty() && viewCountView != null) {
-                                viewCountView.setText("ViewCache size " + (mMapView.getChildCount() - 5));
+                                viewCountView.setText("ViewCache size " + mapView.getMarkerViewContainer().getChildCount());
                             }
                         }
                     }
                 });
 
                 // add a OnMarkerView click listener
-                mMapboxMap.getMarkerViewManager().setOnMarkerViewClickListener(new MapboxMap.OnMarkerViewClickListener() {
+                MarkerViewActivity.this.mapboxMap.getMarkerViewManager().setOnMarkerViewClickListener(new MapboxMap.OnMarkerViewClickListener() {
                     @Override
                     public boolean onMarkerClick(@NonNull Marker marker, @NonNull View view, @NonNull MapboxMap.MarkerViewAdapter adapter) {
                         Toast.makeText(MarkerViewActivity.this, "Hello " + marker.getId(), Toast.LENGTH_SHORT).show();
@@ -149,19 +161,23 @@ public class MarkerViewActivity extends AppCompatActivity {
                     }
                 });
 
-                movingMarkerOne = mMapboxMap.addMarker(new MarkerViewOptions()
+                movingMarkerOne = MarkerViewActivity.this.mapboxMap.addMarker(new MarkerViewOptions()
                         .position(CarLocation.CAR_0_LNGS[0])
-                        .icon(IconFactory.getInstance(mMapView.getContext())
+                        .icon(IconFactory.getInstance(mapView.getContext())
                                 .fromResource(R.drawable.ic_chelsea))
                 );
 
                 movingMarkerTwo = mapboxMap.addMarker(new MarkerViewOptions()
                         .position(CarLocation.CAR_1_LNGS[0])
-                        .icon(IconFactory.getInstance(mMapView.getContext())
+                        .icon(IconFactory.getInstance(mapView.getContext())
                                 .fromResource(R.drawable.ic_arsenal))
                 );
             }
         });
+    }
+
+    private void loopMarkerRotate() {
+        rotateUpdateHandler.postDelayed(rotateMarkerRunnable, 800);
     }
 
     @Override
@@ -178,29 +194,52 @@ public class MarkerViewActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         locationUpdateHandler.removeCallbacks(moveMarkerRunnable);
+        rotateUpdateHandler.removeCallbacks(rotateMarkerRunnable);
     }
 
+    /**
+     * Updates the position of a Marker
+     */
     private class MoveMarkerRunnable implements Runnable {
         @Override
         public void run() {
             int i = randomAnimator.nextInt(9);
             if (randomAnimator.nextInt() % 2 == 0) {
                 movingMarkerOne.setPosition(CarLocation.CAR_0_LNGS[i]);
-                movingMarkerOne.setRotation(rotation = rotation + 45);
             } else {
                 movingMarkerTwo.setPosition(CarLocation.CAR_1_LNGS[i]);
-                movingMarkerTwo.setRotation(rotation = rotation + 90);
             }
             loopMarkerMove();
         }
     }
 
+    /**
+     * Updates the rotation of a Marker
+     */
+    private class RotateMarkerRunnable implements Runnable {
+
+        private final static int ROTATION_INCREASE_VALUE = 9;
+
+        @Override
+        public void run() {
+            rotation -= ROTATION_INCREASE_VALUE;
+            if (rotation >= 0) {
+                rotation += 360;
+            }
+            rotateMarker.setRotation(rotation);
+            loopMarkerRotate();
+        }
+    }
+
+    /**
+     * Adapts a MarkerView to display an abbreviated name in a TextView and a flag in an ImageView.
+     */
     private static class CountryAdapter extends MapboxMap.MarkerViewAdapter<CountryMarkerView> {
 
         private LayoutInflater inflater;
         private MapboxMap mapboxMap;
 
-        public CountryAdapter(@NonNull Context context, @NonNull MapboxMap mapboxMap) {
+        CountryAdapter(@NonNull Context context, @NonNull MapboxMap mapboxMap) {
             super(context);
             this.inflater = LayoutInflater.from(context);
             this.mapboxMap = mapboxMap;
@@ -225,7 +264,8 @@ public class MarkerViewActivity extends AppCompatActivity {
         }
 
         @Override
-        public boolean onSelect(@NonNull final CountryMarkerView marker, @NonNull final View convertView, boolean reselectionForViewReuse) {
+        public boolean onSelect(
+                @NonNull final CountryMarkerView marker, @NonNull final View convertView, boolean reselectionForViewReuse) {
             convertView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             ObjectAnimator rotateAnimator = ObjectAnimator.ofFloat(convertView, View.ROTATION, 0, 360);
             rotateAnimator.setDuration(reselectionForViewReuse ? 0 : 350);
@@ -264,13 +304,15 @@ public class MarkerViewActivity extends AppCompatActivity {
         }
     }
 
-
+    /**
+     * Adapts a MarkerView to display text  in a TextView.
+     */
     private static class TextAdapter extends MapboxMap.MarkerViewAdapter<TextMarkerView> {
 
         private LayoutInflater inflater;
         private MapboxMap mapboxMap;
 
-        public TextAdapter(@NonNull Context context, @NonNull MapboxMap mapboxMap) {
+        TextAdapter(@NonNull Context context, @NonNull MapboxMap mapboxMap) {
             super(context);
             this.inflater = LayoutInflater.from(context);
             this.mapboxMap = mapboxMap;
@@ -293,7 +335,8 @@ public class MarkerViewActivity extends AppCompatActivity {
         }
 
         @Override
-        public boolean onSelect(@NonNull final TextMarkerView marker, @NonNull final View convertView, boolean reselectionForViewReuse) {
+        public boolean onSelect(
+                @NonNull final TextMarkerView marker, @NonNull final View convertView, boolean reselectionForViewReuse) {
             animateGrow(marker, convertView, 0);
 
             // false indicates that we are calling selectMarker after our animation ourselves
@@ -364,31 +407,31 @@ public class MarkerViewActivity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        mMapView.onResume();
+        mapView.onResume();
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        mMapView.onPause();
+        mapView.onPause();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
-        mMapView.onSaveInstanceState(outState);
+        mapView.onSaveInstanceState(outState);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mMapView.onDestroy();
+        mapView.onDestroy();
     }
 
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        mMapView.onLowMemory();
+        mapView.onLowMemory();
     }
 
     @Override
@@ -404,7 +447,7 @@ public class MarkerViewActivity extends AppCompatActivity {
 
     private static class CarLocation {
 
-        public static LatLng[] CAR_0_LNGS = new LatLng[]{
+        static LatLng[] CAR_0_LNGS = new LatLng[]{
                 new LatLng(38.92334425495122, -77.0533673443786),
                 new LatLng(38.9234737236897, -77.05389484528261),
                 new LatLng(38.9257094658146, -76.98819752280579),
@@ -416,7 +459,7 @@ public class MarkerViewActivity extends AppCompatActivity {
                 new LatLng(38.862930274733635, -76.99647808241964)
         };
 
-        public static LatLng[] CAR_1_LNGS = new LatLng[]{
+        static LatLng[] CAR_1_LNGS = new LatLng[]{
                 new LatLng(38.94237975070426, -76.98324549005675),
                 new LatLng(38.941520236084486, -76.98234257804742),
                 new LatLng(38.85972219720714, -76.98955808483929),
@@ -427,6 +470,5 @@ public class MarkerViewActivity extends AppCompatActivity {
                 new LatLng(38.882869724926245, -77.02992539231113),
                 new LatLng(38.9371988177896, -76.97786740676564)
         };
-
     }
 }

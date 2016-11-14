@@ -1,7 +1,6 @@
 package com.mapbox.mapboxsdk.testapp.activity.geocoding;
 
 import android.graphics.PointF;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.ActionBar;
@@ -15,10 +14,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.mapbox.geocoder.GeocoderCriteria;
-import com.mapbox.geocoder.MapboxGeocoder;
-import com.mapbox.geocoder.service.models.GeocoderFeature;
-import com.mapbox.geocoder.service.models.GeocoderResponse;
 import com.mapbox.mapboxsdk.annotations.MarkerOptions;
 import com.mapbox.mapboxsdk.constants.Style;
 import com.mapbox.mapboxsdk.geometry.LatLng;
@@ -27,18 +22,26 @@ import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 import com.mapbox.mapboxsdk.maps.Projection;
 import com.mapbox.mapboxsdk.testapp.R;
+import com.mapbox.services.commons.ServicesException;
+import com.mapbox.services.commons.models.Position;
+import com.mapbox.services.geocoding.v5.GeocodingCriteria;
+import com.mapbox.services.geocoding.v5.MapboxGeocoding;
+import com.mapbox.services.geocoding.v5.models.CarmenFeature;
+import com.mapbox.services.geocoding.v5.models.GeocodingResponse;
 
 import java.util.List;
 
-import retrofit.Callback;
-import retrofit.Response;
-import retrofit.Retrofit;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
-public class GeocoderActivity extends AppCompatActivity {
+public class GeocoderActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private static final String LOG_TAG = "GeocoderActivity";
 
+    private MapboxMap mapboxMap;
     private MapView mapView;
+    private ImageView dropPinView;
     private TextView textView;
 
     @Override
@@ -62,34 +65,35 @@ public class GeocoderActivity extends AppCompatActivity {
         mapView.setStyleUrl(Style.MAPBOX_STREETS);
         mapView.onCreate(savedInstanceState);
 
-        final ImageView dropPinView = new ImageView(this);
+        dropPinView = new ImageView(this);
         dropPinView.setImageResource(R.drawable.ic_droppin_24dp);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
         dropPinView.setLayoutParams(params);
         mapView.addView(dropPinView);
+        mapView.getMapAsync(this);
+    }
 
-        mapView.getMapAsync(new OnMapReadyCallback() {
+    @Override
+    public void onMapReady(MapboxMap map) {
+        mapboxMap = map;
+        final Projection projection = mapboxMap.getProjection();
+        final int width = mapView.getMeasuredWidth();
+        final int height = mapView.getMeasuredHeight();
+
+        // Click listener
+        mapboxMap.setOnMapClickListener(new MapboxMap.OnMapClickListener() {
             @Override
-            public void onMapReady(@NonNull final MapboxMap mapboxMap) {
-                final Projection projection = mapboxMap.getProjection();
-                final int width = mapView.getMeasuredWidth();
-                final int height = mapView.getMeasuredHeight();
+            public void onMapClick(@NonNull LatLng point) {
+                PointF centerPoint = new PointF(width / 2, (height + dropPinView.getHeight()) / 2);
+                LatLng centerLatLng = new LatLng(projection.fromScreenLocation(centerPoint));
 
-                // Click listener
-                mapboxMap.setOnMapClickListener(new MapboxMap.OnMapClickListener() {
-                    @Override
-                    public void onMapClick(@NonNull LatLng point) {
-                        PointF centerPoint = new PointF(width / 2, (height + dropPinView.getHeight()) / 2);
-                        LatLng centerLatLng = new LatLng(projection.fromScreenLocation(centerPoint));
+                setMessage("Geocoding...");
 
-                        setMessage("Geocoding...");
+                mapboxMap.removeAnnotations();
+                mapboxMap.addMarker(new MarkerOptions().position(centerLatLng));
 
-                        mapboxMap.removeAnnotations();
-                        mapboxMap.addMarker(new MarkerOptions().position(centerLatLng));
-
-                        geocode(centerLatLng);
-                    }
-                });
+                geocode(centerLatLng);
             }
         });
     }
@@ -123,40 +127,38 @@ public class GeocoderActivity extends AppCompatActivity {
      */
 
     private void geocode(final LatLng point) {
-        new AsyncTask<Void, Void, Void>() {
 
-            @Override
-            protected Void doInBackground(Void... params) {
-                MapboxGeocoder client = new MapboxGeocoder.Builder()
-                        .setAccessToken(getString(R.string.mapbox_access_token))
-                        .setCoordinates(point.getLongitude(), point.getLatitude())
-                        .setType(GeocoderCriteria.TYPE_POI)
-                        .build();
+        try {
+            MapboxGeocoding client = new MapboxGeocoding.Builder()
+                    .setAccessToken(getString(R.string.mapbox_access_token))
+                    .setCoordinates(Position.fromCoordinates(point.getLongitude(), point.getLatitude()))
+                    .setGeocodingType(GeocodingCriteria.TYPE_POI)
+                    .build();
 
-                client.enqueue(new Callback<GeocoderResponse>()
+            client.enqueueCall(new Callback<GeocodingResponse>() {
+                @Override
+                public void onResponse(Call<GeocodingResponse> call, Response<GeocodingResponse> response) {
 
-                               {
-                                   @Override
-                                   public void onResponse(Response<GeocoderResponse> response, Retrofit retrofit) {
-                                       List<GeocoderFeature> results = response.body().getFeatures();
-                                       if (results.size() > 0) {
-                                           String placeName = results.get(0).getPlaceName();
-                                           setSuccess(placeName);
-                                       } else {
-                                           setMessage("No results.");
-                                       }
-                                   }
+                    List<CarmenFeature> results = response.body().getFeatures();
+                    if (results.size() > 0) {
+                        String placeName = results.get(0).getPlaceName();
+                        setSuccess(placeName);
+                    } else {
+                        setMessage("No results.");
+                    }
 
-                                   @Override
-                                   public void onFailure(Throwable t) {
-                                       setError(t.getMessage());
-                                   }
-                               }
+                }
 
-                );
-                return null;
-            }
-        }.execute();
+                @Override
+                public void onFailure(Call<GeocodingResponse> call, Throwable throwable) {
+                    setError(throwable.getMessage());
+                }
+            });
+        } catch (ServicesException servicesException) {
+            Log.e(LOG_TAG, "Error geocoding: " + servicesException.toString());
+            servicesException.printStackTrace();
+            setError(servicesException.getMessage());
+        }
     }
 
     /*

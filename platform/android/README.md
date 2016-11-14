@@ -6,7 +6,7 @@ A library based on [Mapbox GL Native](../../README.md) for embedding interactive
 
 **To install and use the Mapbox Android SDK in an application, see the [Mapbox Android SDK website](https://www.mapbox.com/android-sdk/).**
 
-[![](https://www.mapbox.com/android-sdk/images/splash.jpg)](https://www.mapbox.com/android-sdk/)
+[![](https://www.mapbox.com/android-sdk/images/splash.png)](https://www.mapbox.com/android-sdk/)
 
 ## Contributing to the SDK
 
@@ -15,7 +15,7 @@ A library based on [Mapbox GL Native](../../README.md) for embedding interactive
 Building the SDK yourself requires [a number of dependencies and steps](../../INSTALL.md) that are unnecessary for developing production applications.
 
 * [Contributing on Linux](CONTRIBUTING_LINUX.md)
-* [Contributing on OS X](CONTRIBUTING_OSX.md)
+* [Contributing on macOS](CONTRIBUTING_MACOS.md)
 
 ### Setting up the Android emulator
 

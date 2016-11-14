@@ -9,8 +9,7 @@
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/noncopyable.hpp>
 #include <mbgl/annotation/annotation.hpp>
-#include <mbgl/style/types.hpp>
-#include <mbgl/style/property_transition.hpp>
+#include <mbgl/style/transition_options.hpp>
 
 #include <cstdint>
 #include <string>
@@ -20,17 +19,21 @@
 
 namespace mbgl {
 
-class FileSource;
 class View;
+class FileSource;
+class Scheduler;
 class SpriteImage;
-class PointAnnotation;
-class ShapeAnnotation;
 struct CameraOptions;
 struct AnimationOptions;
 
+namespace style {
+class Source;
+class Layer;
+} // namespace style
+
 class Map : private util::noncopyable {
 public:
-    explicit Map(View&, FileSource&,
+    explicit Map(View&, FileSource&, Scheduler&,
                  MapMode mapMode = MapMode::Continuous,
                  GLContextMode contextMode = GLContextMode::Unique,
                  ConstrainMode constrainMode = ConstrainMode::HeightOnly,
@@ -49,15 +52,18 @@ public:
     void update(Update update);
 
     // Styling
-    void addClass(const std::string&, const PropertyTransition& = {});
-    void removeClass(const std::string&, const PropertyTransition& = {});
-    void setClasses(const std::vector<std::string>&, const PropertyTransition& = {});
+    void addClass(const std::string&);
+    void removeClass(const std::string&);
+    void setClasses(const std::vector<std::string>&);
+
+    style::TransitionOptions getTransitionOptions() const;
+    void setTransitionOptions(const style::TransitionOptions&);
 
     bool hasClass(const std::string&) const;
     std::vector<std::string> getClasses() const;
 
-    void setStyleURL(const std::string& url);
-    void setStyleJSON(const std::string& json, const std::string& base = "");
+    void setStyleURL(const std::string&);
+    void setStyleJSON(const std::string&);
     std::string getStyleURL() const;
     std::string getStyleJSON() const;
 
@@ -142,30 +148,35 @@ public:
     void removeAnnotationIcon(const std::string&);
     double getTopOffsetPixelsForAnnotationIcon(const std::string&);
 
-    AnnotationID addPointAnnotation(const PointAnnotation&);
-    AnnotationIDs addPointAnnotations(const std::vector<PointAnnotation>&);
-
-    AnnotationID addShapeAnnotation(const ShapeAnnotation&);
-    AnnotationIDs addShapeAnnotations(const std::vector<ShapeAnnotation>&);
-
-    void updatePointAnnotation(AnnotationID, const PointAnnotation&);
-
+    AnnotationID addAnnotation(const Annotation&);
+    void updateAnnotation(AnnotationID, const Annotation&);
     void removeAnnotation(AnnotationID);
-    void removeAnnotations(const AnnotationIDs&);
 
-    AnnotationIDs getPointAnnotationsInBounds(const LatLngBounds&);
+    // Sources
+    style::Source* getSource(const std::string& sourceID);
+    void addSource(std::unique_ptr<style::Source>);
+    void removeSource(const std::string& sourceID);
 
-    void addCustomLayer(const std::string& id,
-                        CustomLayerInitializeFunction,
-                        CustomLayerRenderFunction,
-                        CustomLayerDeinitializeFunction,
-                        void* context,
-                        const char* before = nullptr);
-    void removeCustomLayer(const std::string& id);
+    // Layers
+    style::Layer* getLayer(const std::string& layerID);
+    void addLayer(std::unique_ptr<style::Layer>, const optional<std::string>& beforeLayerID = {});
+    void removeLayer(const std::string& layerID);
+
+    // Add image, bound to the style
+    void addImage(const std::string&, std::unique_ptr<const SpriteImage>);
+    void removeImage(const std::string&);
+
+    // Defaults
+    std::string getStyleName() const;
+    LatLng getDefaultLatLng() const;
+    double getDefaultZoom() const;
+    double getDefaultBearing() const;
+    double getDefaultPitch() const;
 
     // Feature queries
     std::vector<Feature> queryRenderedFeatures(const ScreenCoordinate&, const optional<std::vector<std::string>>& layerIDs = {});
     std::vector<Feature> queryRenderedFeatures(const ScreenBox&,        const optional<std::vector<std::string>>& layerIDs = {});
+    AnnotationIDs queryPointAnnotations(const ScreenBox&);
 
     // Memory
     void setSourceTileCacheSize(size_t);

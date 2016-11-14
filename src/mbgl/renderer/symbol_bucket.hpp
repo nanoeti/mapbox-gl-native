@@ -1,157 +1,78 @@
 #pragma once
 
 #include <mbgl/renderer/bucket.hpp>
-#include <mbgl/tile/geometry_tile.hpp>
+#include <mbgl/renderer/element_group.hpp>
 #include <mbgl/map/mode.hpp>
-#include <mbgl/geometry/vao.hpp>
-#include <mbgl/geometry/elements_buffer.hpp>
-#include <mbgl/geometry/text_buffer.hpp>
-#include <mbgl/geometry/icon_buffer.hpp>
-#include <mbgl/geometry/collision_box_buffer.hpp>
-#include <mbgl/text/glyph.hpp>
-#include <mbgl/text/collision_feature.hpp>
-#include <mbgl/text/shaping.hpp>
-#include <mbgl/text/quads.hpp>
-#include <mbgl/style/filter.hpp>
-#include <mbgl/layer/symbol_layer.hpp>
+#include <mbgl/gl/vertex_buffer.hpp>
+#include <mbgl/gl/index_buffer.hpp>
+#include <mbgl/shader/symbol_vertex.hpp>
+#include <mbgl/shader/collision_box_vertex.hpp>
+#include <mbgl/text/glyph_range.hpp>
+#include <mbgl/style/layers/symbol_layer_properties.hpp>
 
 #include <memory>
-#include <map>
-#include <set>
 #include <vector>
 
 namespace mbgl {
 
-class SDFShader;
-class IconShader;
+class SymbolSDFShader;
+class SymbolIconShader;
 class CollisionBoxShader;
-class CollisionTile;
-class SpriteAtlas;
-class SpriteStore;
-class GlyphAtlas;
-class GlyphStore;
-class IndexedSubfeature;
-
-class SymbolFeature {
-public:
-    GeometryCollection geometry;
-    std::u32string label;
-    std::string sprite;
-    std::size_t index;
-};
-
-struct Anchor;
-
-class SymbolInstance {
-    public:
-        explicit SymbolInstance(Anchor& anchor, const GeometryCoordinates& line,
-                const Shaping& shapedText, const PositionedIcon& shapedIcon,
-                const SymbolLayoutProperties& layout, const bool inside, const uint32_t index,
-                const float textBoxScale, const float textPadding, const float textAlongLine,
-                const float iconBoxScale, const float iconPadding, const float iconAlongLine,
-                const GlyphPositions& face, const IndexedSubfeature& indexedfeature);
-        Point<float> point;
-        uint32_t index;
-        bool hasText;
-        bool hasIcon;
-        SymbolQuads glyphQuads;
-        SymbolQuads iconQuads;
-        CollisionFeature textCollisionFeature;
-        CollisionFeature iconCollisionFeature;
-};
 
 class SymbolBucket : public Bucket {
-    typedef ElementGroup<1> TextElementGroup;
-    typedef ElementGroup<2> IconElementGroup;
-    typedef ElementGroup<1> CollisionBoxElementGroup;
-
 public:
-    SymbolBucket(uint32_t overscaling, float zoom, const MapMode, const std::string& bucketName_, const std::string& sourceLayerName_);
-    ~SymbolBucket() override;
+    SymbolBucket(const MapMode,
+                 style::SymbolLayoutProperties,
+                 bool sdfIcons,
+                 bool iconsNeedLinear);
 
-    void upload(gl::GLObjectStore&) override;
-    void render(Painter&, const StyleLayer&, const UnwrappedTileID&, const mat4&) override;
+    void upload(gl::Context&) override;
+    void render(Painter&, PaintParameters&, const style::Layer&, const RenderTile&) override;
     bool hasData() const override;
     bool hasTextData() const;
     bool hasIconData() const;
     bool hasCollisionBoxData() const;
     bool needsClipping() const override;
 
-    void addFeatures(uintptr_t tileUID,
-                     SpriteAtlas&,
-                     GlyphAtlas&,
-                     GlyphStore&);
+    void drawGlyphs(SymbolSDFShader&, gl::Context&, PaintMode);
+    void drawIcons(SymbolSDFShader&, gl::Context&, PaintMode);
+    void drawIcons(SymbolIconShader&, gl::Context&, PaintMode);
+    void drawCollisionBoxes(CollisionBoxShader&, gl::Context&);
 
-    void drawGlyphs(SDFShader&, gl::GLObjectStore&);
-    void drawIcons(SDFShader&, gl::GLObjectStore&);
-    void drawIcons(IconShader&, gl::GLObjectStore&);
-    void drawCollisionBoxes(CollisionBoxShader&, gl::GLObjectStore&);
-
-    void parseFeatures(const GeometryTileLayer&, const Filter&);
-    bool needsDependencies(GlyphStore&, SpriteStore&);
-    void placeFeatures(CollisionTile&) override;
-
-private:
-    void addFeature(const GeometryCollection &lines,
-            const Shaping &shapedText, const PositionedIcon &shapedIcon,
-            const GlyphPositions &face,
-            const size_t index);
-    bool anchorIsTooClose(const std::u32string &text, const float repeatDistance, Anchor &anchor);
-    std::map<std::u32string, std::vector<Anchor>> compareText;
-    
-    void addToDebugBuffers(CollisionTile &collisionTile);
-
-    void swapRenderData() override;
-
-    // Adds placed items to the buffer.
-    template <typename Buffer, typename GroupType>
-    void addSymbols(Buffer &buffer, const SymbolQuads &symbols, float scale,
-            const bool keepUpright, const bool alongLine, const float placementAngle);
-
-public:
-    SymbolLayoutProperties layout;
-
-    float iconMaxSize = 1.0f;
-    float textMaxSize = 16.0f;
-
-    bool sdfIcons = false;
-    bool iconsNeedLinear = false;
-
-private:
-
-    const float overscaling;
-    const float zoom;
-    const uint32_t tileSize;
-    const float tilePixelRatio;
     const MapMode mode;
-    const std::string bucketName;
-    const std::string sourceLayerName;
+    const style::SymbolLayoutProperties layout;
+    const bool sdfIcons;
+    const bool iconsNeedLinear;
 
-    std::set<GlyphRange> ranges;
-    std::vector<SymbolInstance> symbolInstances;
-    std::vector<SymbolFeature> features;
+private:
+    friend class SymbolLayout;
 
-    struct SymbolRenderData {
-        struct TextBuffer {
-            TextVertexBuffer vertices;
-            TriangleElementsBuffer triangles;
-            std::vector<std::unique_ptr<TextElementGroup>> groups;
-        } text;
+    struct TextBuffer {
+        std::vector<SymbolVertex> vertices;
+        std::vector<gl::Triangle> triangles;
+        std::vector<ElementGroup<SymbolSDFShader>> groups;
 
-        struct IconBuffer {
-            IconVertexBuffer vertices;
-            TriangleElementsBuffer triangles;
-            std::vector<std::unique_ptr<IconElementGroup>> groups;
-        } icon;
+        optional<gl::VertexBuffer<SymbolVertex>> vertexBuffer;
+        optional<gl::IndexBuffer<gl::Triangle>> indexBuffer;
+    } text;
 
-        struct CollisionBoxBuffer {
-            CollisionBoxVertexBuffer vertices;
-            std::vector<std::unique_ptr<CollisionBoxElementGroup>> groups;
-        } collisionBox;
-    };
+    struct IconBuffer {
+        std::vector<SymbolVertex> vertices;
+        std::vector<gl::Triangle> triangles;
+        std::vector<ElementGroup<SymbolSDFShader, SymbolIconShader>> groups;
 
-    std::unique_ptr<SymbolRenderData> renderData;
-    std::unique_ptr<SymbolRenderData> renderDataInProgress;
+        optional<gl::VertexBuffer<SymbolVertex>> vertexBuffer;
+        optional<gl::IndexBuffer<gl::Triangle>> indexBuffer;
+    } icon;
+
+    struct CollisionBoxBuffer {
+        std::vector<CollisionBoxVertex> vertices;
+        std::vector<gl::Line> lines;
+        std::vector<ElementGroup<CollisionBoxShader>> groups;
+
+        optional<gl::VertexBuffer<CollisionBoxVertex>> vertexBuffer;
+        optional<gl::IndexBuffer<gl::Line>> indexBuffer;
+    } collisionBox;
 };
 
 } // namespace mbgl

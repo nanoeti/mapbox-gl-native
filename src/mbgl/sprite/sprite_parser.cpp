@@ -46,7 +46,7 @@ SpriteImagePtr createSpriteImage(const PremultipliedImage& image,
 
 namespace {
 
-inline uint16_t getUInt16(const JSValue& value, const char* name, const uint16_t def = 0) {
+uint16_t getUInt16(const JSValue& value, const char* name, const uint16_t def = 0) {
     if (value.HasMember(name)) {
         auto& v = value[name];
         if (v.IsUint() && v.GetUint() <= std::numeric_limits<uint16_t>::max()) {
@@ -60,7 +60,7 @@ inline uint16_t getUInt16(const JSValue& value, const char* name, const uint16_t
     return def;
 }
 
-inline double getDouble(const JSValue& value, const char* name, const double def = 0) {
+double getDouble(const JSValue& value, const char* name, const double def = 0) {
     if (value.HasMember(name)) {
         auto& v = value[name];
         if (v.IsNumber()) {
@@ -73,7 +73,7 @@ inline double getDouble(const JSValue& value, const char* name, const double def
     return def;
 }
 
-inline bool getBoolean(const JSValue& value, const char* name, const bool def = false) {
+bool getBoolean(const JSValue& value, const char* name, const bool def = false) {
     if (value.HasMember(name)) {
         auto& v = value[name];
         if (v.IsBool()) {
@@ -108,9 +108,9 @@ SpriteParseResult parseSprite(const std::string& image, const std::string& json)
     } else if (!doc.IsObject()) {
         return std::make_exception_ptr(std::runtime_error("Sprite JSON root must be an object"));
     } else {
-        for (JSValue::ConstMemberIterator itr = doc.MemberBegin(); itr != doc.MemberEnd(); ++itr) {
-            const std::string name = { itr->name.GetString(), itr->name.GetStringLength() };
-            const JSValue& value = itr->value;
+        for (const auto& property : doc.GetObject()) {
+            const std::string name = { property.name.GetString(), property.name.GetStringLength() };
+            const JSValue& value = property.value;
 
             if (value.IsObject()) {
                 const uint16_t x = getUInt16(value, "x", 0);

@@ -123,7 +123,7 @@ const NSTimeInterval MGLFlushInterval = 180;
 @property (nonatomic) MGLLocationManager *locationManager;
 @property (nonatomic) NSTimer *timer;
 @property (nonatomic) NSDate *instanceIDRotationDate;
-@property (nonatomic) NSDate *turnstileSendDate;
+@property (nonatomic) NSDate *nextTurnstileSendDate;
 
 @end
 
@@ -147,10 +147,16 @@ const NSTimeInterval MGLFlushInterval = 180;
 #if TARGET_OS_SIMULATOR
     return NO;
 #else
+    BOOL isLowPowerModeEnabled = NO;
+    if ([NSProcessInfo instancesRespondToSelector:@selector(isLowPowerModeEnabled)]) {
+        isLowPowerModeEnabled = [[NSProcessInfo processInfo] isLowPowerModeEnabled];
+    }
     return ([[NSUserDefaults standardUserDefaults] boolForKey:@"MGLMapboxMetricsEnabled"] &&
-            [[NSUserDefaults standardUserDefaults] integerForKey:@"MGLMapboxAccountType"] == 0);
+            [[NSUserDefaults standardUserDefaults] integerForKey:@"MGLMapboxAccountType"] == 0 &&
+            !isLowPowerModeEnabled);
 #endif
 }
+
 
 - (BOOL)debugLoggingEnabled {
     return (self.canEnableDebugLogging &&
@@ -202,7 +208,12 @@ const NSTimeInterval MGLFlushInterval = 180;
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(userDefaultsDidChange:) name:NSUserDefaultsDidChangeNotification object:nil];
        
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:UIApplicationDidEnterBackgroundNotification object:nil];
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:UIApplicationWillEnterForegroundNotification object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:UIApplicationDidBecomeActiveNotification object:nil];
+
+        // Watch for Low Power Mode change events
+        if (&NSProcessInfoPowerStateDidChangeNotification != NULL) {
+            [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(pauseOrResumeMetricsCollectionIfRequired) name:NSProcessInfoPowerStateDidChangeNotification object:nil];
+        }
     }
     return self;
 }
@@ -253,12 +264,11 @@ const NSTimeInterval MGLFlushInterval = 180;
         return;
     }
     
-    // Toggle pause based on current pause state and current settings state
-    // Practically, a pause only occurs because of a change to an NSUserDefaultsDidChangeNotification
-    BOOL enabledInSettings = [[self class] isEnabled];
-    if (self.paused && enabledInSettings) {
+    // Toggle pause based on current pause state, user opt-out state, and low-power state.
+    BOOL enabled = [[self class] isEnabled];
+    if (self.paused && enabled) {
         [self resumeMetricsCollection];
-    } else if (!self.paused && !enabledInSettings) {
+    } else if (!self.paused && !enabled) {
         [self pauseMetricsCollection];
     }
 }
@@ -281,7 +291,7 @@ const NSTimeInterval MGLFlushInterval = 180;
     if (!self.paused || ![[self class] isEnabled]) {
         return;
     }
-    
+
     self.paused = NO;
     self.data = [[MGLMapboxEventsData alloc] init];
     
@@ -315,7 +325,7 @@ const NSTimeInterval MGLFlushInterval = 180;
 }
 
 - (void)pushTurnstileEvent {
-    if (self.turnstileSendDate && [[NSDate date] timeIntervalSinceDate:self.turnstileSendDate] < 0) {
+    if (self.nextTurnstileSendDate && [[NSDate date] timeIntervalSinceDate:self.nextTurnstileSendDate] < 0) {
         return;
     }
     
@@ -342,9 +352,23 @@ const NSTimeInterval MGLFlushInterval = 180;
             return;
         }
         [strongSelf writeEventToLocalDebugLog:turnstileEventAttributes];
-        NSTimeInterval twentyFourHourTimeInterval = 24 * 3600;
-        strongSelf.turnstileSendDate = [[NSDate date] dateByAddingTimeInterval:twentyFourHourTimeInterval];
+        [strongSelf updateNextTurnstileSendDate];
     }];
+}
+
+- (void)updateNextTurnstileSendDate {
+    // Find the time a day from now (sometime tomorrow)
+    NSCalendar *calendar = [[NSCalendar alloc] initWithCalendarIdentifier:NSCalendarIdentifierGregorian];
+    NSDateComponents *dayComponent = [[NSDateComponents alloc] init];
+    dayComponent.day = 1;
+    NSDate *sometimeTomorrow = [calendar dateByAddingComponents:dayComponent toDate:[NSDate date] options:0];
+   
+    // Find the start of tomorrow and use that as the next turnstile send date. The effect of this is that
+    // turnstile events can be sent as much as once per calendar day and always at the start of a session
+    // when a map load happens.
+    NSDate *startOfTomorrow = nil;
+    [calendar rangeOfUnit:NSCalendarUnitDay startDate:&startOfTomorrow interval:nil forDate:sometimeTomorrow];
+    self.nextTurnstileSendDate = startOfTomorrow;
 }
 
 + (void)pushEvent:(NSString *)event withAttributes:(MGLMapboxEventAttributes *)attributeDictionary {

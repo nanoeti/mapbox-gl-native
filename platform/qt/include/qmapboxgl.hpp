@@ -85,7 +85,6 @@ class Q_DECL_EXPORT QMapboxGL : public QObject
     Q_PROPERTY(double zoom READ zoom WRITE setZoom)
     Q_PROPERTY(double bearing READ bearing WRITE setBearing)
     Q_PROPERTY(double pitch READ pitch WRITE setPitch)
-    Q_ENUMS(MapChange)
 
 public:
     // Determines the orientation of the map.
@@ -96,34 +95,16 @@ public:
         NorthLeftwards,
     };
 
-    // Reflects mbgl::MapChange.
-    enum MapChange {
-        MapChangeRegionWillChange = 0,
-        MapChangeRegionWillChangeAnimated,
-        MapChangeRegionIsChanging,
-        MapChangeRegionDidChange,
-        MapChangeRegionDidChangeAnimated,
-        MapChangeWillStartLoadingMap,
-        MapChangeDidFinishLoadingMap,
-        MapChangeDidFailLoadingMap,
-        MapChangeWillStartRenderingFrame,
-        MapChangeDidFinishRenderingFrame,
-        MapChangeDidFinishRenderingFrameFullyRendered,
-        MapChangeWillStartRenderingMap,
-        MapChangeDidFinishRenderingMap,
-        MapChangeDidFinishRenderingMapFullyRendered
-    };
-
     QMapboxGL(QObject *parent = 0, const QMapboxGLSettings& = QMapboxGLSettings());
     virtual ~QMapboxGL();
 
     void cycleDebugOptions();
 
-    QString styleJSON() const;
-    QString styleURL() const;
+    QString styleJson() const;
+    QString styleUrl() const;
 
-    void setStyleJSON(const QString &);
-    void setStyleURL(const QString &);
+    void setStyleJson(const QString &);
+    void setStyleUrl(const QString &);
 
     double latitude() const;
     void setLatitude(double latitude);
@@ -164,16 +145,18 @@ public:
     void setClasses(const QStringList &);
     QStringList getClasses() const;
 
-    QMapbox::AnnotationID addPointAnnotation(const QMapbox::PointAnnotation &);
-    QMapbox::AnnotationIDs addPointAnnotations(const QMapbox::PointAnnotations &);
+    QMapbox::TransitionOptions getTransitionOptions() const;
+    void setTransitionOptions(const QMapbox::TransitionOptions&);
 
+    QMapbox::AnnotationID addPointAnnotation(const QMapbox::PointAnnotation &);
     QMapbox::AnnotationID addShapeAnnotation(const QMapbox::ShapeAnnotation &);
-    QMapbox::AnnotationIDs addShapeAnnotations(const QMapbox::ShapeAnnotations &);
 
     void updatePointAnnotation(QMapbox::AnnotationID, const QMapbox::PointAnnotation &);
 
     void removeAnnotation(QMapbox::AnnotationID);
-    void removeAnnotations(const QMapbox::AnnotationIDs &);
+
+    void setLayoutProperty(const QString &layer, const QString &property, const QVariant &value);
+    void setPaintProperty(const QString &layer, const QString &property, const QVariant &value, const QString &klass = QString());
 
     bool isRotating() const;
     bool isScaling() const;
@@ -197,13 +180,22 @@ public:
     void setMargins(const QMargins &margins);
     QMargins margins() const;
 
+    void addSource(const QString &sourceID, const QVariantMap& params);
+    void removeSource(const QString &sourceID);
+
+    void addImage(const QString &name, const QImage &sprite);
+    void removeImage(const QString &name);
+
     void addCustomLayer(const QString &id,
         QMapbox::CustomLayerInitializeFunction,
         QMapbox::CustomLayerRenderFunction,
         QMapbox::CustomLayerDeinitializeFunction,
         void* context,
         char* before = NULL);
-    void removeCustomLayer(const QString& id);
+    void addLayer(const QVariantMap &params);
+    void removeLayer(const QString &id);
+
+    void setFilter(const QString &layer, const QVariant &filter);
 
 public slots:
     void render();
@@ -211,14 +203,12 @@ public slots:
 
 signals:
     void needsRendering();
-    void mapChanged(QMapboxGL::MapChange);
+    void mapChanged(QMapbox::MapChange);
 
 private:
     Q_DISABLE_COPY(QMapboxGL)
 
     QMapboxGLPrivate *d_ptr;
 };
-
-Q_DECLARE_METATYPE(QMapboxGL::MapChange);
 
 #endif // QMAPBOXGL_H

@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import com.mapbox.mapboxsdk.exceptions.InvalidMarkerPositionException;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 
 
@@ -21,14 +22,10 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
  */
 public final class MarkerOptions extends BaseMarkerOptions<Marker, MarkerOptions> implements Parcelable {
 
-    private Marker marker;
-
     public MarkerOptions() {
-        marker = new Marker();
     }
 
     protected MarkerOptions(Parcel in) {
-        marker = new Marker();
         position((LatLng) in.readParcelable(LatLng.class.getClassLoader()));
         snippet(in.readString());
         title(in.readString());
@@ -70,11 +67,11 @@ public final class MarkerOptions extends BaseMarkerOptions<Marker, MarkerOptions
      * @return Marker The build marker
      */
     public Marker getMarker() {
-        marker.setPosition(position);
-        marker.setSnippet(snippet);
-        marker.setTitle(title);
-        marker.setIcon(icon);
-        return marker;
+        if (position == null) {
+            throw new InvalidMarkerPositionException();
+        }
+
+        return new Marker(position, icon, title, snippet);
     }
 
     public LatLng getPosition() {

@@ -1,12 +1,12 @@
 package com.mapbox.mapboxsdk.maps;
 
+import android.graphics.PointF;
 import android.support.annotation.ColorInt;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.annotation.UiThread;
 import android.view.Gravity;
 import android.view.View;
-
-import com.mapbox.mapboxsdk.maps.widgets.MyLocationViewSettings;
 
 /**
  * Settings for the user interface of a MapboxMap. To obtain this interface, call getUiSettings().
@@ -15,7 +15,7 @@ public class UiSettings {
 
     private MapView mapView;
 
-    private ViewSettings compassSettings;
+    private CompassViewSettings compassSettings;
     private ViewSettings logoSettings;
     private ViewSettings attributionSettings;
 
@@ -33,9 +33,13 @@ public class UiSettings {
 
     private boolean zoomControlsEnabled;
 
+    private boolean deselectMarkersOnTap = true;
+
+    private PointF focalPoint;
+
     UiSettings(@NonNull MapView mapView) {
         this.mapView = mapView;
-        this.compassSettings = new ViewSettings();
+        this.compassSettings = new CompassViewSettings();
         this.logoSettings = new ViewSettings();
         this.attributionSettings = new ViewSettings();
     }
@@ -79,6 +83,28 @@ public class UiSettings {
     public void setCompassGravity(int gravity) {
         compassSettings.setGravity(gravity);
         mapView.setCompassGravity(gravity);
+    }
+
+    /**
+     * Enables or disables fading of the compass when facing north.
+     * <p>
+     * By default this feature is enabled
+     * </p>
+     *
+     * @param compassFadeFacingNorth True to enable the fading animation; false to disable it
+     */
+    public void setCompassFadeFacingNorth(boolean compassFadeFacingNorth) {
+        compassSettings.setFadeFacingNorth(compassFadeFacingNorth);
+        mapView.setCompassFadeFacingNorth(compassFadeFacingNorth);
+    }
+
+    /**
+     * Returns whether the compass performs a fading animation out when facing north.
+     *
+     * @return True if the compass will fade, false if it remains visible
+     */
+    public boolean isCompassFadeWhenFacingNorth(){
+        return compassSettings.isFadeFacingNorth();
     }
 
     /**
@@ -484,6 +510,26 @@ public class UiSettings {
     }
 
     /**
+     * Gets whether the markers are automatically deselected (and therefore, their infowindows
+     * closed) when a map tap is detected.
+     *
+     * @return If true, markers are deselected on a map tap.
+     */
+    public boolean isDeselectMarkersOnTap() {
+        return deselectMarkersOnTap;
+    }
+
+    /**
+     * Sets whether the markers are automatically deselected (and therefore, their infowindows
+     * closed) when a map tap is detected.
+     *
+     * @param deselectMarkersOnTap determines if markers should be deslected on tap
+     */
+    public void setDeselectMarkersOnTap(boolean deselectMarkersOnTap) {
+        this.deselectMarkersOnTap = deselectMarkersOnTap;
+    }
+
+    /**
      * <p>
      * Changes whether the user may scroll around the map.
      * </p>
@@ -539,6 +585,25 @@ public class UiSettings {
         setRotateGesturesEnabled(enabled);
         setTiltGesturesEnabled(enabled);
         setZoomGesturesEnabled(enabled);
+    }
+
+    /**
+     * Sets the focal point used as center for a gesture
+     *
+     * @param focalPoint the focal point to be used.
+     */
+    public void setFocalPoint(@Nullable PointF focalPoint) {
+        this.focalPoint = focalPoint;
+        mapView.setFocalPoint(focalPoint);
+    }
+
+    /**
+     * Returns the gesture focal point
+     *
+     * @return The focal point
+     */
+    public PointF getFocalPoint() {
+        return focalPoint;
     }
 
     /**

@@ -1,17 +1,15 @@
 #include <mbgl/shader/raster_shader.hpp>
 #include <mbgl/shader/raster.vertex.hpp>
 #include <mbgl/shader/raster.fragment.hpp>
-#include <mbgl/gl/gl.hpp>
+#include <mbgl/shader/raster_vertex.hpp>
 
-#include <cstdio>
+namespace mbgl {
 
-using namespace mbgl;
-
-RasterShader::RasterShader(gl::GLObjectStore& glObjectStore)
-    : Shader("raster", shaders::raster::vertex, shaders::raster::fragment, glObjectStore) {
+RasterShader::RasterShader(gl::Context& context, Defines defines)
+    : Shader(shaders::raster::name,
+             shaders::raster::vertex,
+             shaders::raster::fragment,
+             context, defines) {
 }
 
-void RasterShader::bind(GLbyte* offset) {
-    MBGL_CHECK_ERROR(glEnableVertexAttribArray(a_pos));
-    MBGL_CHECK_ERROR(glVertexAttribPointer(a_pos, 2, GL_SHORT, false, 0, offset));
-}
+} // namespace mbgl

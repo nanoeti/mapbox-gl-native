@@ -1,27 +1,31 @@
 {
   "name": "mapbox-gl-native",
-  "version": "3.1.2",
+  "version": "3.3.3",
   "description": "Renders map tiles with Mapbox GL",
   "keywords": [
     "mapbox",
     "gl"
   ],
-  "main": "lib/mapbox-gl-native.node",
+  "main": "platform/node/index.js",
   "repository": {
     "type": "git",
     "url": "git://github.com/mapbox/mapbox-gl-native.git"
   },
   "license": "BSD-2-Clause",
   "dependencies": {
-    "nan": "^2.3.3",
-    "node-pre-gyp": "^0.6.26"
+    "node-pre-gyp": "^0.6.28"
   },
   "devDependencies": {
     "aws-sdk": "^2.3.5",
+    "csscolorparser": "^1.0.2",
+    "ejs": "^2.4.1",
     "express": "^4.11.1",
-    "mapbox-gl-shaders": "mapbox/mapbox-gl-shaders#4a567b438be303fbbf13e5ddf49d72d8debd811d",
-    "mapbox-gl-test-suite": "mapbox/mapbox-gl-test-suite#b3441d9a285ffbe9b876677acb13d7df07e5b975",
-    "node-gyp": "^3.3.1",
+    "lodash": "^4.16.4",
+    "mapbox-gl-shaders": "mapbox/mapbox-gl-shaders#98a56d538b11fb331aa67a6d632d6ecd6821b007",
+    "mapbox-gl-style-spec": "mapbox/mapbox-gl-style-spec#7f62a4fc9f21e619824d68abbc4b03cbc1685572",
+    "mapbox-gl-test-suite": "mapbox/mapbox-gl-test-suite#844ecd23c3314eec509dbcdaf0f956d5504e6fef",
+    "mkdirp": "^0.5.1",
+    "node-cmake": "^1.2.1",
     "request": "^2.72.0",
     "tape": "^4.5.1"
   },
@@ -32,6 +36,7 @@
     "preinstall": "npm install node-pre-gyp",
     "install": "node-pre-gyp install --fallback-to-build=false || make node",
     "test": "tape platform/node/test/js/**/*.test.js",
+    "test-memory": "node --expose-gc platform/node/test/memory.test.js",
     "test-suite": "node platform/node/test/render.test.js && node platform/node/test/query.test.js"
   },
   "gypfile": true,

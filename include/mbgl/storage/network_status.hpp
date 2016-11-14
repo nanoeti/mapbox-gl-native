@@ -1,9 +1,8 @@
 #pragma once
 
-#include <mbgl/util/atomic.hpp>
-
+#include <atomic>
 #include <mutex>
-#include <set>
+#include <unordered_set>
 
 namespace mbgl {
 
@@ -27,9 +26,9 @@ public:
     static void Unsubscribe(util::AsyncTask* async);
 
 private:
-    static util::Atomic<bool> online;
+    static std::atomic<bool> online;
     static std::mutex mtx;
-    static std::set<util::AsyncTask*> observers;
+    static std::unordered_set<util::AsyncTask*> observers;
 };
 
 } // namespace mbgl

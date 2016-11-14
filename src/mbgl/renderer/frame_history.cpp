@@ -1,12 +1,14 @@
 #include <mbgl/renderer/frame_history.hpp>
 #include <mbgl/math/minmax.hpp>
+#include <mbgl/gl/context.hpp>
+#include <mbgl/gl/gl.hpp>
 
-using namespace mbgl;
+namespace mbgl {
 
 FrameHistory::FrameHistory() {
     changeOpacities.fill(0);
     opacities.fill(0);
-};
+}
 
 void FrameHistory::record(const TimePoint& now, float zoom, const Duration& duration) {
 
@@ -57,11 +59,11 @@ bool FrameHistory::needsAnimation(const Duration& duration) const {
     return (time - previousTime) < duration;
 }
 
-void FrameHistory::upload(gl::GLObjectStore& glObjectStore) {
+void FrameHistory::upload(gl::Context& context, uint32_t unit) {
 
     if (changed) {
-        const bool first = !texture.created();
-        bind(glObjectStore);
+        const bool first = !texture;
+        bind(context, unit);
 
         if (first) {
             MBGL_CHECK_ERROR(glTexImage2D(
@@ -94,19 +96,22 @@ void FrameHistory::upload(gl::GLObjectStore& glObjectStore) {
     }
 }
 
-void FrameHistory::bind(gl::GLObjectStore& glObjectStore) {
-    if (!texture.created()) {
-        texture.create(glObjectStore);
-        MBGL_CHECK_ERROR(glBindTexture(GL_TEXTURE_2D, texture.getID()));
-#ifndef GL_ES_VERSION_2_0
+void FrameHistory::bind(gl::Context& context, uint32_t unit) {
+    if (!texture) {
+        texture = context.createTexture();
+        context.activeTexture = unit;
+        context.texture[unit] = *texture;
+#if not MBGL_USE_GLES2
         MBGL_CHECK_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0));
 #endif
         MBGL_CHECK_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
         MBGL_CHECK_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
         MBGL_CHECK_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST));
         MBGL_CHECK_ERROR(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST));
-    } else {
-        MBGL_CHECK_ERROR(glBindTexture(GL_TEXTURE_2D, texture.getID()));
+    } else if (context.texture[unit] != *texture) {
+        context.activeTexture = unit;
+        context.texture[unit] = *texture;
     }
-
 }
+
+} // namespace mbgl

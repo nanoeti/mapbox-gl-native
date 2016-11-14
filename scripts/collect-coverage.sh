@@ -3,8 +3,8 @@
 set -e
 set -o pipefail
 
-if [ -z ${ENABLE_COVERAGE} ] ; then
-    echo "ENABLE_COVERAGE environment variable is not set, aborting."
+if [ -z ${WITH_COVERAGE} ] ; then
+    echo "WITH_COVERAGE environment variable is not set, aborting."
     exit 1
 fi
 
@@ -15,7 +15,7 @@ function usage() {
     if [ `uname -s` = 'Linux' ]; then
         echo "On Debian-based distros, you can install them via 'apt-get install lcov'"
     elif [ `uname -s` = 'Darwin' ]; then
-        echo "On OS X, you can install them via 'brew install lcov'"
+        echo "On macOS, you can install them via 'brew install lcov'"
     fi
     exit 1
 }
@@ -32,7 +32,7 @@ lcov \
     >/dev/null 2>&1
 
 # Run all unit tests
-make test-*
+make
 
 # Collect coverage data and save it into coverage.info
 echo "Collecting coverage data..."

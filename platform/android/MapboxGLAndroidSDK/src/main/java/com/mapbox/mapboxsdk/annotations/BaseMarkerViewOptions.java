@@ -29,6 +29,7 @@ public abstract class BaseMarkerViewOptions<U extends MarkerView, T extends Base
     protected float rotation;
     protected boolean visible = true;
     protected boolean selected;
+    protected float alpha = 1.0f;
 
     /**
      * Default constructor
@@ -125,6 +126,12 @@ public abstract class BaseMarkerViewOptions<U extends MarkerView, T extends Base
      */
     public T rotation(float rotation) {
         this.rotation = rotation;
+        while (this.rotation > 360) {
+            this.rotation -= 360;
+        }
+        while (this.rotation < 0) {
+            this.rotation += 360;
+        }
         return getThis();
     }
 
@@ -132,10 +139,21 @@ public abstract class BaseMarkerViewOptions<U extends MarkerView, T extends Base
      * Set the visibility state of the MarkerView.
      *
      * @param visible the visible state
-     * @return the object for which the method was calleds
+     * @return the object for which the method was called
      */
     public T visible(boolean visible) {
         this.visible = visible;
+        return getThis();
+    }
+
+    /**
+     * Set the alpha of the MarkerView.
+     *
+     * @param alpha the alpha value
+     * @return the object for which the method was called
+     */
+    public T alpha(float alpha) {
+        this.alpha = alpha;
         return getThis();
     }
 
@@ -236,6 +254,15 @@ public abstract class BaseMarkerViewOptions<U extends MarkerView, T extends Base
      */
     public boolean isVisible() {
         return visible;
+    }
+
+    /**
+     * Get the alpha of the MarkerView.
+     *
+     * @return the alpha value
+     */
+    public float getAlpha() {
+        return alpha;
     }
 
     /**

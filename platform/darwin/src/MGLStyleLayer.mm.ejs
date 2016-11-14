@@ -1,0 +1,98 @@
+<%
+  const type = locals.type;
+  const layoutProperties = locals.layoutProperties;
+  const paintProperties = locals.paintProperties;
+-%>
+// This file is generated. 
+// Edit platform/darwin/scripts/generate-style-code.js, then run `make style-code-darwin`.
+
+#import "MGLSource.h"
+#import "NSPredicate+MGLAdditions.h"
+#import "MGLStyleLayer_Private.h"
+#import "MGLStyleValue_Private.h"
+#import "MGL<%- camelize(type) %>StyleLayer.h"
+
+#include <mbgl/style/layers/<%- type %>_layer.hpp>
+
+@interface MGL<%- camelize(type) %>StyleLayer ()
+
+@property (nonatomic) mbgl::style::<%- camelize(type) %>Layer *layer;
+
+@end
+
+@implementation MGL<%- camelize(type) %>StyleLayer
+
+<% if (type == 'background') { -%>
+- (instancetype)initWithIdentifier:(NSString *)identifier
+{
+    if (self = [super initWithIdentifier:identifier]) {
+        _layer = new mbgl::style::<%- camelize(type) %>Layer(identifier.UTF8String);
+    }
+    return self;
+}
+<% } else { -%>
+- (instancetype)initWithIdentifier:(NSString *)identifier source:(MGLSource *)source
+{
+    if (self = [super initWithIdentifier:identifier source:source]) {
+        _layer = new mbgl::style::<%- camelize(type) %>Layer(identifier.UTF8String, source.identifier.UTF8String);
+    }
+    return self;
+}
+<% } -%>
+
+<% if (type !== 'background' && type !== 'raster') { -%>
+- (NSString *)sourceLayerIdentifier
+{
+    auto layerID = self.layer->getSourceLayer();
+    return layerID.empty() ? nil : @(layerID.c_str());
+}
+
+- (void)setSourceLayerIdentifier:(NSString *)sourceLayerIdentifier
+{
+    self.layer->setSourceLayer(sourceLayerIdentifier.UTF8String ?: "");
+}
+
+- (void)setPredicate:(NSPredicate *)predicate
+{
+    self.layer->setFilter(predicate.mgl_filter);
+}
+
+- (NSPredicate *)predicate
+{
+    return [NSPredicate mgl_predicateWithFilter:self.layer->getFilter()];
+}
+
+<% } -%>
+<% if (layoutProperties.length) { -%>
+#pragma mark - Accessing the Layout Attributes
+
+<% for (const property of layoutProperties) { -%>
+- (void)set<%- camelize(property.name) %>:(MGLStyleValue<<%- propertyType(property, true) %>> *)<%- objCName(property) %> {
+    auto mbglValue = MGLStyleValueTransformer<<%- valueTransformerArguments(property).join(', ') %>>().toPropertyValue(<%- objCName(property) %>);
+    self.layer->set<%- camelize(property.name) %>(mbglValue);
+}
+
+- (MGLStyleValue<<%- propertyType(property, true) %>> *)<%- objCName(property) %> {
+    auto propertyValue = self.layer->get<%- camelize(property.name) %>() ?: self.layer->getDefault<%- camelize(property.name) %>();
+    return MGLStyleValueTransformer<<%- valueTransformerArguments(property).join(', ') %>>().toStyleValue(propertyValue);
+}
+
+<% } -%>
+<% } -%>
+<% if (paintProperties.length) { -%>
+#pragma mark - Accessing the Paint Attributes
+
+<% for (const property of paintProperties) { -%>
+- (void)set<%- camelize(property.name) %>:(MGLStyleValue<<%- propertyType(property, true) %>> *)<%- objCName(property) %> {
+    auto mbglValue = MGLStyleValueTransformer<<%- valueTransformerArguments(property).join(', ') %>>().toPropertyValue(<%- objCName(property) %>);
+    self.layer->set<%- camelize(property.name) %>(mbglValue);
+}
+
+- (MGLStyleValue<<%- propertyType(property, true) %>> *)<%- objCName(property) %> {
+    auto propertyValue = self.layer->get<%- camelize(property.name) %>() ?: self.layer->getDefault<%- camelize(property.name) %>();
+    return MGLStyleValueTransformer<<%- valueTransformerArguments(property).join(', ') %>>().toStyleValue(propertyValue);
+}
+
+<% } -%>
+<% } -%>
+@end

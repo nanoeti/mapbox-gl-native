@@ -1,28 +1,35 @@
 #pragma once
 
 #include <mbgl/renderer/bucket.hpp>
-#include <mbgl/util/raster.hpp>
+#include <mbgl/util/image.hpp>
+#include <mbgl/util/optional.hpp>
+#include <mbgl/gl/texture.hpp>
 
 namespace mbgl {
 
 class RasterShader;
-class StaticVertexBuffer;
+class RasterVertex;
+
+namespace gl {
+class Context;
+template <class> class VertexBuffer;
 class VertexArrayObject;
+} // namespace gl
 
 class RasterBucket : public Bucket {
 public:
-    RasterBucket(gl::TexturePool&);
+    RasterBucket(PremultipliedImage&&);
 
-    void upload(gl::GLObjectStore&) override;
-    void render(Painter&, const StyleLayer&, const UnwrappedTileID&, const mat4&) override;
+    void upload(gl::Context&) override;
+    void render(Painter&, PaintParameters&, const style::Layer&, const RenderTile&) override;
     bool hasData() const override;
     bool needsClipping() const override;
 
-    void setImage(PremultipliedImage);
+    void drawRaster(RasterShader&, gl::VertexBuffer<RasterVertex>&, gl::VertexArrayObject&, gl::Context&);
 
-    void drawRaster(RasterShader&, StaticVertexBuffer&, VertexArrayObject&, gl::GLObjectStore&);
-
-    Raster raster;
+private:
+    PremultipliedImage image;
+    optional<gl::Texture> texture;
 };
 
 } // namespace mbgl

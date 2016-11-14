@@ -3,8 +3,9 @@
 #include <mbgl/mbgl.hpp>
 #include <mbgl/util/run_loop.hpp>
 #include <mbgl/util/timer.hpp>
+#include <mbgl/util/geometry.hpp>
 
-#ifdef MBGL_USE_GLES2
+#if MBGL_USE_GLES2
 #define GLFW_INCLUDE_ES2
 #endif
 #define GL_GLEXT_PROTOTYPES
@@ -13,7 +14,7 @@
 class GLFWView : public mbgl::View {
 public:
     GLFWView(bool fullscreen = false, bool benchmark = false);
-    ~GLFWView();
+    ~GLFWView() override;
 
     float getPixelRatio() const override;
     std::array<uint16_t, 2> getSize() const override;
@@ -41,15 +42,20 @@ public:
 
     void run();
     void report(float duration);
+    
+    void setMapChangeCallback(std::function<void(mbgl::MapChange)> callback);
+    void notifyMapChange(mbgl::MapChange change) override;
 
 private:
-    mbgl::LatLng makeRandomPoint() const;
+    mbgl::Color makeRandomColor() const;
+    mbgl::Point<double> makeRandomPoint() const;
     static std::shared_ptr<const mbgl::SpriteImage>
     makeSpriteImage(int width, int height, float pixelRatio);
 
     void nextOrientation();
 
     void addRandomPointAnnotations(int count);
+    void addRandomLineAnnotations(int count);
     void addRandomShapeAnnotations(int count);
     void addRandomCustomPointAnnotations(int count);
 
@@ -58,6 +64,8 @@ private:
 
     mbgl::AnnotationIDs annotationIDs;
     std::vector<std::string> spriteIDs;
+
+    std::function<void(mbgl::MapChange)> mapChangeCallback;
 
 private:
     bool fullscreen = false;

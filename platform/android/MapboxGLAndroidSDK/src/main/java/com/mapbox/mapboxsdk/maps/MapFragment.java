@@ -4,13 +4,16 @@ import android.app.Fragment;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.content.ContextCompat;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import com.mapbox.mapboxsdk.R;
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
 
 /**
@@ -29,8 +32,8 @@ import com.mapbox.mapboxsdk.constants.MapboxConstants;
  */
 public final class MapFragment extends Fragment {
 
-    private MapView mMap;
-    private OnMapReadyCallback mOnMapReadyCallback;
+    private MapView map;
+    private OnMapReadyCallback onMapReadyCallback;
 
     /**
      * Creates a MapFragment instance
@@ -57,6 +60,7 @@ public final class MapFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         super.onCreateView(inflater, container, savedInstanceState);
+        Context context = inflater.getContext();
         MapboxMapOptions options = null;
 
         // Get bundle
@@ -65,7 +69,27 @@ public final class MapFragment extends Fragment {
             options = bundle.getParcelable(MapboxConstants.FRAG_ARG_MAPBOXMAPOPTIONS);
         }
 
-        return mMap = new MapView(inflater.getContext(), options);
+        if (options == null) {
+            options = new MapboxMapOptions();
+        }
+
+        Drawable foregroundDrawable = options.getMyLocationForegroundDrawable();
+        Drawable foregroundBearingDrawable = options.getMyLocationForegroundBearingDrawable();
+        if (foregroundDrawable == null || foregroundBearingDrawable == null) {
+            if (foregroundDrawable == null) {
+                foregroundDrawable = ContextCompat.getDrawable(context, R.drawable.ic_mylocationview_normal);
+            }
+            if (foregroundBearingDrawable == null) {
+                foregroundBearingDrawable = ContextCompat.getDrawable(context, R.drawable.ic_mylocationview_bearing);
+            }
+            options.myLocationForegroundDrawables(foregroundDrawable, foregroundBearingDrawable);
+        }
+
+        if (options.getMyLocationBackgroundDrawable() == null) {
+            options.myLocationBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_mylocationview_background));
+        }
+
+        return map = new MapView(inflater.getContext(), options);
     }
 
     /**
@@ -77,7 +101,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        mMap.onCreate(savedInstanceState);
+        map.onCreate(savedInstanceState);
     }
 
     /**
@@ -86,7 +110,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        mMap.getMapAsync(mOnMapReadyCallback);
+        map.getMapAsync(onMapReadyCallback);
     }
 
     /**
@@ -95,7 +119,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        mMap.onResume();
+        map.onResume();
     }
 
     /**
@@ -104,7 +128,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
-        mMap.onPause();
+        map.onPause();
     }
 
     /**
@@ -115,7 +139,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
-        mMap.onSaveInstanceState(outState);
+        map.onSaveInstanceState(outState);
     }
 
     /**
@@ -132,7 +156,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onLowMemory() {
         super.onLowMemory();
-        mMap.onLowMemory();
+        map.onLowMemory();
     }
 
     /**
@@ -141,7 +165,7 @@ public final class MapFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        mMap.onDestroy();
+        map.onDestroy();
     }
 
     /**
@@ -150,6 +174,6 @@ public final class MapFragment extends Fragment {
      * @param onMapReadyCallback The callback to be invoked.
      */
     public void getMapAsync(@NonNull final OnMapReadyCallback onMapReadyCallback) {
-        mOnMapReadyCallback = onMapReadyCallback;
+        this.onMapReadyCallback = onMapReadyCallback;
     }
 }

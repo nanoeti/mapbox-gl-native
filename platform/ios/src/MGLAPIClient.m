@@ -1,14 +1,16 @@
 #import "MGLAPIClient.h"
 #import "NSBundle+MGLAdditions.h"
+#import "NSData+MGLAdditions.h"
 #import "MGLAccountManager.h"
 
 static NSString * const MGLAPIClientUserAgentBase = @"MapboxEventsiOS";
-static NSString * const MGLAPIClientBaseURL = @"https://api.mapbox.com";
+static NSString * const MGLAPIClientBaseURL = @"https://events.mapbox.com";
 static NSString * const MGLAPIClientEventsPath = @"events/v2";
 
 static NSString * const MGLAPIClientHeaderFieldUserAgentKey = @"User-Agent";
 static NSString * const MGLAPIClientHeaderFieldContentTypeKey = @"Content-Type";
 static NSString * const MGLAPIClientHeaderFieldContentTypeValue = @"application/json";
+static NSString * const MGLAPIClientHeaderFieldContentEncodingKey = @"Content-Encoding";
 static NSString * const MGLAPIClientHTTPMethodPost = @"POST";
 
 @interface MGLAPIClient ()
@@ -61,7 +63,9 @@ static NSString * const MGLAPIClientHTTPMethodPost = @"POST";
         dataTask = nil;
     }];
     [dataTask resume];
-    [self.dataTasks addObject:dataTask];
+    if (dataTask) {
+        [self.dataTasks addObject:dataTask];
+    }
 }
 
 - (void)postEvent:(nonnull MGLMapboxEventAttributes *)event completionHandler:(nullable void (^)(NSError * _Nullable error))completionHandler {
@@ -82,8 +86,22 @@ static NSString * const MGLAPIClientHTTPMethodPost = @"POST";
     [request setValue:self.userAgent forHTTPHeaderField:MGLAPIClientHeaderFieldUserAgentKey];
     [request setValue:MGLAPIClientHeaderFieldContentTypeValue forHTTPHeaderField:MGLAPIClientHeaderFieldContentTypeKey];
     [request setHTTPMethod:MGLAPIClientHTTPMethodPost];
+    
     NSData *jsonData = [self serializedDataForEvents:events];
-    [request setHTTPBody:jsonData];
+    
+    // Compressing less than 3 events can have a negative impact on the size.
+    if (events.count > 2) {
+        NSData *compressedData = [jsonData mgl_compressedData];
+        [request setValue:@"deflate" forHTTPHeaderField:MGLAPIClientHeaderFieldContentEncodingKey];
+        [request setHTTPBody:compressedData];
+    }
+    
+    // Set JSON data if events.count were less than 3 or something went wrong with compressing HTTP body data.
+    if (!request.HTTPBody) {
+        [request setValue:nil forHTTPHeaderField:MGLAPIClientHeaderFieldContentEncodingKey];
+        [request setHTTPBody:jsonData];
+    }
+    
     return [request copy];
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mbgl/util/geo.hpp>
+#include <mbgl/util/range.hpp>
 #include <mbgl/util/optional.hpp>
 #include <mbgl/style/types.hpp>
 #include <mbgl/storage/response.hpp>
@@ -12,7 +13,6 @@
 namespace mbgl {
 
 class TileID;
-class SourceInfo;
 
 /*
  * An offline region defined by a style URL, geographic bounding box, zoom range, and
@@ -27,10 +27,10 @@ class SourceInfo;
  */
 class OfflineTilePyramidRegionDefinition {
 public:
-    OfflineTilePyramidRegionDefinition(const std::string&, const LatLngBounds&, double, double, float);
+    OfflineTilePyramidRegionDefinition(std::string, LatLngBounds, double, double, float);
 
     /* Private */
-    std::vector<CanonicalTileID> tileCover(SourceType, uint16_t tileSize, const SourceInfo&) const;
+    std::vector<CanonicalTileID> tileCover(SourceType, uint16_t tileSize, const Range<uint8_t>& zoomRange) const;
 
     const std::string styleURL;
     const LatLngBounds bounds;
@@ -200,8 +200,8 @@ private:
     friend class OfflineDatabase;
 
     OfflineRegion(int64_t id,
-                  const OfflineRegionDefinition&,
-                  const OfflineRegionMetadata&);
+                  OfflineRegionDefinition,
+                  OfflineRegionMetadata);
 
     const int64_t id;
     const OfflineRegionDefinition definition;

@@ -3,6 +3,7 @@
 #include <mbgl/map/map.hpp>
 #include <mbgl/map/view.hpp>
 #include <mbgl/util/noncopyable.hpp>
+#include <mbgl/platform/default/thread_pool.hpp>
 #include <mbgl/storage/default_file_source.hpp>
 
 #include <string>
@@ -49,6 +50,8 @@ public:
     mbgl::EdgeInsets getInsets() { return insets;}
     void setInsets(mbgl::EdgeInsets insets_);
 
+    void scheduleTakeSnapshot();
+
 private:
     EGLConfig chooseConfig(const EGLConfig configs[], EGLint numConfigs);
 
@@ -79,6 +82,7 @@ private:
     bool firstTime = false;
     bool fpsEnabled = false;
     bool sizeChanged = false;
+    bool snapshot = false;
     double fps = 0.0;
 
     int width = 0;
@@ -92,8 +96,11 @@ private:
 
     // Ensure these are initialised last
     std::unique_ptr<mbgl::DefaultFileSource> fileSource;
+    mbgl::ThreadPool threadPool;
     std::unique_ptr<mbgl::Map> map;
     mbgl::EdgeInsets insets;
+
+    unsigned active = 0;
 };
 }
 }

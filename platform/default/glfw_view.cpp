@@ -1,16 +1,17 @@
 #include <mbgl/platform/default/glfw_view.hpp>
-#include <mbgl/annotation/point_annotation.hpp>
-#include <mbgl/annotation/shape_annotation.hpp>
+#include <mbgl/annotation/annotation.hpp>
 #include <mbgl/sprite/sprite_image.hpp>
-#include <mbgl/style/property_transition.hpp>
+#include <mbgl/style/transition_options.hpp>
 #include <mbgl/gl/gl.hpp>
-#include <mbgl/gl/gl_values.hpp>
-#include <mbgl/gl/gl_helper.hpp>
+#include <mbgl/gl/extension.hpp>
 #include <mbgl/platform/log.hpp>
 #include <mbgl/platform/platform.hpp>
 #include <mbgl/util/string.hpp>
 #include <mbgl/util/chrono.hpp>
 #include <mbgl/map/camera.hpp>
+
+#include <mbgl/gl/state.hpp>
+#include <mbgl/gl/value.hpp>
 
 #include <cassert>
 #include <cstdlib>
@@ -24,7 +25,7 @@ GLFWView::GLFWView(bool fullscreen_, bool benchmark_)
     : fullscreen(fullscreen_), benchmark(benchmark_) {
     glfwSetErrorCallback(glfwError);
 
-    std::srand(std::time(0));
+    std::srand(std::time(nullptr));
 
     if (!glfwInit()) {
         mbgl::Log::Error(mbgl::Event::OpenGL, "failed to initialize glfw");
@@ -56,7 +57,7 @@ GLFWView::GLFWView(bool fullscreen_, bool benchmark_)
     glfwWindowHint(GLFW_STENCIL_BITS, 8);
     glfwWindowHint(GLFW_DEPTH_BITS, 16);
 
-    window = glfwCreateWindow(width, height, "Mapbox GL", monitor, NULL);
+    window = glfwCreateWindow(width, height, "Mapbox GL", monitor, nullptr);
     if (!window) {
         glfwTerminate();
         mbgl::Log::Error(mbgl::Event::OpenGL, "failed to initialize window");
@@ -98,12 +99,14 @@ GLFWView::GLFWView(bool fullscreen_, bool benchmark_)
     printf("- Press `Z` to cycle through north orientations\n");
     printf("- Prezz `X` to cycle through the viewport modes\n");
     printf("- Press `A` to cycle through Mapbox offices in the world + dateline monument\n");
+    printf("- Press `B` to cycle through the color, stencil, and depth buffer\n");
     printf("\n");
     printf("- Press `1` through `6` to add increasing numbers of point annotations for testing\n");
     printf("- Press `7` through `0` to add increasing numbers of shape annotations for testing\n");
     printf("\n");
     printf("- Press `Q` to remove annotations\n");
     printf("- Press `P` to add a random custom runtime imagery annotation\n");
+    printf("- Press `L` to add a random line annotation\n");
     printf("- Press `W` to pop the last-added annotation off\n");
     printf("\n");
     printf("- `Control` + mouse drag to rotate\n");
@@ -147,14 +150,27 @@ void GLFWView::onKey(GLFWwindow *window, int key, int /*scancode*/, int action, 
             break;
         case GLFW_KEY_R:
             if (!mods) {
-                static const mbgl::PropertyTransition transition { { mbgl::Milliseconds(300) } };
+                static const mbgl::style::TransitionOptions transition { { mbgl::Milliseconds(300) } };
+                view->map->setTransitionOptions(transition);
                 if (view->map->hasClass("night")) {
-                    view->map->removeClass("night", transition);
+                    view->map->removeClass("night");
                 } else {
-                    view->map->addClass("night", transition);
+                    view->map->addClass("night");
                 }
             }
             break;
+        case GLFW_KEY_B: {
+            auto debug = view->map->getDebug();
+            if (debug & mbgl::MapDebugOptions::StencilClip) {
+                debug &= ~mbgl::MapDebugOptions::StencilClip;
+                debug |= mbgl::MapDebugOptions::DepthBuffer;
+            } else if (debug & mbgl::MapDebugOptions::DepthBuffer) {
+                debug &= ~mbgl::MapDebugOptions::DepthBuffer;
+            } else {
+                debug |= mbgl::MapDebugOptions::StencilClip;
+            }
+            view->map->setDebug(debug);
+        } break;
         case GLFW_KEY_N:
             if (!mods)
                 view->map->resetNorth();
@@ -162,12 +178,19 @@ void GLFWView::onKey(GLFWwindow *window, int key, int /*scancode*/, int action, 
         case GLFW_KEY_Z:
             view->nextOrientation();
             break;
-        case GLFW_KEY_Q:
+        case GLFW_KEY_Q: {
+            auto result = view->map->queryPointAnnotations({ {}, { double(view->getSize()[0]), double(view->getSize()[1]) } });
+            printf("visible point annotations: %lu\n", result.size());
+        } break;
+        case GLFW_KEY_C:
             view->clearAnnotations();
             break;
-        case GLFW_KEY_P: {
+        case GLFW_KEY_P:
             view->addRandomCustomPointAnnotations(1);
-        } break;
+            break;
+        case GLFW_KEY_L:
+            view->addRandomLineAnnotations(1);
+            break;
         case GLFW_KEY_A: {
             // XXX Fix precision loss in flyTo:
             // https://github.com/mapbox/mapbox-gl-native/issues/4298
@@ -208,10 +231,18 @@ void GLFWView::onKey(GLFWwindow *window, int key, int /*scancode*/, int action, 
     }
 }
 
-mbgl::LatLng GLFWView::makeRandomPoint() const {
+mbgl::Color GLFWView::makeRandomColor() const {
+    const float r = 1.0f * (float(std::rand()) / RAND_MAX);
+    const float g = 1.0f * (float(std::rand()) / RAND_MAX);
+    const float b = 1.0f * (float(std::rand()) / RAND_MAX);
+    return { r, g, b, 1.0f };
+}
+
+mbgl::Point<double> GLFWView::makeRandomPoint() const {
     const double x = width * double(std::rand()) / RAND_MAX;
     const double y = height * double(std::rand()) / RAND_MAX;
-    return map->latLngForPixel({ x, y });
+    mbgl::LatLng latLng = map->latLngForPixel({ x, y });
+    return { latLng.longitude, latLng.latitude };
 }
 
 std::shared_ptr<const mbgl::SpriteImage>
@@ -254,59 +285,44 @@ void GLFWView::nextOrientation() {
 }
 
 void GLFWView::addRandomCustomPointAnnotations(int count) {
-    std::vector<mbgl::PointAnnotation> points;
-
     for (int i = 0; i < count; i++) {
         static int spriteID = 1;
         const auto name = std::string{ "marker-" } + mbgl::util::toString(spriteID++);
         map->addAnnotationIcon(name, makeSpriteImage(22, 22, 1));
         spriteIDs.push_back(name);
-        points.emplace_back(makeRandomPoint(), name);
+        annotationIDs.push_back(map->addAnnotation(mbgl::SymbolAnnotation { makeRandomPoint(), name }));
     }
-
-    auto newIDs = map->addPointAnnotations(points);
-    annotationIDs.insert(annotationIDs.end(), newIDs.begin(), newIDs.end());
 }
 
 void GLFWView::addRandomPointAnnotations(int count) {
-    std::vector<mbgl::PointAnnotation> points;
-
-    for (int i = 0; i < count; i++) {
-        points.emplace_back(makeRandomPoint(), "default_marker");
+    for (int i = 0; i < count; ++i) {
+        annotationIDs.push_back(map->addAnnotation(mbgl::SymbolAnnotation { makeRandomPoint(), "default_marker" }));
     }
+}
 
-    auto newIDs = map->addPointAnnotations(points);
-    annotationIDs.insert(annotationIDs.end(), newIDs.begin(), newIDs.end());
+void GLFWView::addRandomLineAnnotations(int count) {
+    for (int i = 0; i < count; ++i) {
+        mbgl::LineString<double> lineString;
+        for (int j = 0; j < 3; ++j) {
+            lineString.push_back(makeRandomPoint());
+        }
+        annotationIDs.push_back(map->addAnnotation(mbgl::LineAnnotation { lineString, 1.0f, 2.0f, { makeRandomColor() } }));
+    }
 }
 
 void GLFWView::addRandomShapeAnnotations(int count) {
-    std::vector<mbgl::ShapeAnnotation> shapes;
-
-    mbgl::FillAnnotationProperties properties;
-    properties.opacity = .1;
-
-    for (int i = 0; i < count; i++) {
-        mbgl::AnnotationSegment triangle;
-        triangle.push_back(makeRandomPoint());
-        triangle.push_back(makeRandomPoint());
-        triangle.push_back(makeRandomPoint());
-
-        mbgl::AnnotationSegments segments;
-        segments.push_back(triangle);
-
-        shapes.emplace_back(segments, properties);
+    for (int i = 0; i < count; ++i) {
+        mbgl::Polygon<double> triangle;
+        triangle.push_back({ makeRandomPoint(), makeRandomPoint(), makeRandomPoint() });
+        annotationIDs.push_back(map->addAnnotation(mbgl::FillAnnotation { triangle, 0.5f, { makeRandomColor() }, { makeRandomColor() } }));
     }
-
-    auto newIDs = map->addShapeAnnotations(shapes);
-    annotationIDs.insert(annotationIDs.end(), newIDs.begin(), newIDs.end());
 }
 
 void GLFWView::clearAnnotations() {
-    if (annotationIDs.empty()) {
-        return;
+    for (const auto& id : annotationIDs) {
+        map->removeAnnotation(id);
     }
 
-    map->removeAnnotations(annotationIDs);
     annotationIDs.clear();
 }
 
@@ -496,6 +512,16 @@ void GLFWView::setWindowTitle(const std::string& title) {
     glfwSetWindowTitle(window, (std::string { "Mapbox GL: " } + title).c_str());
 }
 
+void GLFWView::setMapChangeCallback(std::function<void(mbgl::MapChange)> callback) {
+    this->mapChangeCallback = callback;
+}
+
+void GLFWView::notifyMapChange(mbgl::MapChange change) {
+    if (mapChangeCallback) {
+        mapChangeCallback(change);
+    }
+}
+
 namespace mbgl {
 namespace platform {
 
@@ -523,8 +549,8 @@ void showDebugImage(std::string name, const char *data, size_t width, size_t hei
     float scale = static_cast<float>(fbWidth) / static_cast<float>(width);
 
     {
-        gl::Preserve<gl::PixelZoom> pixelZoom;
-        gl::Preserve<gl::RasterPos> rasterPos;
+        gl::PreserveState<gl::value::PixelZoom> pixelZoom;
+        gl::PreserveState<gl::value::RasterPos> rasterPos;
 
         MBGL_CHECK_ERROR(glPixelZoom(scale, -scale));
         MBGL_CHECK_ERROR(glRasterPos2f(-1.0f, 1.0f));
@@ -560,11 +586,11 @@ void showColorDebugImage(std::string name, const char *data, size_t logicalWidth
     float yScale = static_cast<float>(fbHeight) / static_cast<float>(height);
 
     {
-        gl::Preserve<gl::ClearColor> clearColor;
-        gl::Preserve<gl::Blend> blend;
-        gl::Preserve<gl::BlendFunc> blendFunc;
-        gl::Preserve<gl::PixelZoom> pixelZoom;
-        gl::Preserve<gl::RasterPos> rasterPos;
+        gl::PreserveState<gl::value::ClearColor> clearColor;
+        gl::PreserveState<gl::value::Blend> blend;
+        gl::PreserveState<gl::value::BlendFunc> blendFunc;
+        gl::PreserveState<gl::value::PixelZoom> pixelZoom;
+        gl::PreserveState<gl::value::RasterPos> rasterPos;
 
         MBGL_CHECK_ERROR(glClearColor(0.8, 0.8, 0.8, 1));
         MBGL_CHECK_ERROR(glClear(GL_COLOR_BUFFER_BIT));

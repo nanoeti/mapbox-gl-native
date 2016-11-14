@@ -3,12 +3,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@class MGLMapView;
+
 @interface MGLAnnotationView (Private)
 
-@property (nonatomic) id<MGLAnnotation> annotation;
 @property (nonatomic, readwrite, nullable) NSString *reuseIdentifier;
-
-- (void)setCenter:(CGPoint)center pitch:(CGFloat)pitch;
+@property (nonatomic, readwrite, nullable) id <MGLAnnotation> annotation;
+@property (nonatomic, weak) MGLMapView *mapView;
 
 @end
 

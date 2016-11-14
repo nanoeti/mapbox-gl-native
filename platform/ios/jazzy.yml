@@ -19,42 +19,63 @@ custom_categories:
     children:
       - MGLAccountManager
       - MGLMapCamera
-      - MGLMapDebugMaskOptions
       - MGLMapView
       - MGLMapViewDelegate
       - MGLStyle
-      - MGLStyleDefaultVersion
       - MGLUserTrackingMode
   - name: Annotations
     children:
       - MGLAnnotation
       - MGLAnnotationImage
-      - MGLAnnotationVerticalAlignment
+      - MGLAnnotationView
       - MGLCalloutView
       - MGLCalloutViewDelegate
       - MGLMultiPoint
+      - MGLMultiPolygon
+      - MGLMultiPolyline
       - MGLPointAnnotation
       - MGLPolygon
       - MGLPolyline
       - MGLOverlay
       - MGLShape
+      - MGLShapeCollection
       - MGLUserLocation
+      - MGLUserLocationAnnotationView
+  - name: Map Data
+    children:
+      - MGLFeature
+      - MGLMultiPointFeature
+      - MGLMultiPolygonFeature
+      - MGLMultiPolylineFeature
+      - MGLPointFeature
+      - MGLPolygonFeature
+      - MGLPolylineFeature
+      - MGLShapeCollectionFeature
+  - name: Style Layers
+    children:
+      - MGLBackgroundStyleLayer
+      - MGLCircleStyleLayer
+      - MGLFillStyleLayer
+      - MGLForegroundStyleLayer
+      - MGLLineStyleLayer
+      - MGLRasterStyleLayer
+      - MGLStyleLayer
+      - MGLSymbolStyleLayer
+      - MGLVectorStyleLayer
+  - name: Data Sources
+    children:
+      - MGLSource
+      - MGLGeoJSONSource
+      - MGLRasterSource
+      - MGLTileSet
+      - MGLVectorSource
   - name: Offline Maps
     children:
       - MGLOfflineRegion
       - MGLOfflineStorage
       - MGLOfflinePack
-      - MGLOfflinePackAdditionCompletionHandler
-      - MGLOfflinePackErrorNotification
-      - MGLOfflinePackErrorUserInfoKey
-      - MGLOfflinePackMaximumCountUserInfoKey
-      - MGLOfflinePackMaximumMapboxTilesReachedNotification
       - MGLOfflinePackProgress
-      - MGLOfflinePackProgressChangedNotification
-      - MGLOfflinePackProgressUserInfoKey
-      - MGLOfflinePackRemovalCompletionHandler
       - MGLOfflinePackState
-      - MGLOfflinePackStateUserInfoKey
       - MGLTilePyramidOfflineRegion
   - name: Geometry
     children:
@@ -67,6 +88,7 @@ custom_categories:
       - MGLCoordinateBoundsMake
       - MGLCoordinateBoundsOffset
       - MGLCoordinateFormatter
+      - MGLCoordinateInCoordinateBounds
       - MGLCoordinateSpan
       - MGLCoordinateSpanEqualToCoordinateSpan
       - MGLCoordinateSpanMake

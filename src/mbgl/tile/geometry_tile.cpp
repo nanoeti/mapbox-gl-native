@@ -1,135 +1,149 @@
 #include <mbgl/tile/geometry_tile.hpp>
-#include <mbgl/tile/tile_id.hpp>
+#include <mbgl/tile/geometry_tile_worker.hpp>
+#include <mbgl/tile/geometry_tile_data.hpp>
+#include <mbgl/tile/tile_observer.hpp>
+#include <mbgl/style/update_parameters.hpp>
+#include <mbgl/style/layer_impl.hpp>
+#include <mbgl/style/layers/background_layer.hpp>
+#include <mbgl/style/layers/custom_layer.hpp>
+#include <mbgl/style/style.hpp>
+#include <mbgl/storage/file_source.hpp>
+#include <mbgl/geometry/feature_index.hpp>
+#include <mbgl/text/collision_tile.hpp>
+#include <mbgl/map/transform_state.hpp>
+#include <mbgl/util/run_loop.hpp>
 
 namespace mbgl {
 
-static double signedArea(const GeometryCoordinates& ring) {
-    double sum = 0;
+using namespace style;
 
-    for (std::size_t i = 0, len = ring.size(), j = len - 1; i < len; j = i++) {
-        const GeometryCoordinate& p1 = ring[i];
-        const GeometryCoordinate& p2 = ring[j];
-        sum += (p2.x - p1.x) * (p1.y + p2.y);
-    }
-
-    return sum;
+GeometryTile::GeometryTile(const OverscaledTileID& id_,
+                           std::string sourceID_,
+                           const style::UpdateParameters& parameters)
+    : Tile(id_),
+      sourceID(std::move(sourceID_)),
+      style(parameters.style),
+      mailbox(std::make_shared<Mailbox>(*util::RunLoop::Get())),
+      worker(parameters.workerScheduler,
+             ActorRef<GeometryTile>(*this, mailbox),
+             id_,
+             *parameters.style.glyphAtlas,
+             obsolete,
+             parameters.mode) {
 }
 
-std::vector<GeometryCollection> classifyRings(const GeometryCollection& rings) {
-    std::vector<GeometryCollection> polygons;
+GeometryTile::~GeometryTile() {
+    cancel();
+}
 
-    std::size_t len = rings.size();
+void GeometryTile::cancel() {
+    obsolete = true;
+}
 
-    if (len <= 1) {
-        polygons.push_back(rings);
-        return polygons;
+void GeometryTile::setError(std::exception_ptr err) {
+    observer->onTileError(*this, err);
+}
+
+void GeometryTile::setData(std::unique_ptr<const GeometryTileData> data_) {
+    // Mark the tile as pending again if it was complete before to prevent signaling a complete
+    // state despite pending parse operations.
+    if (availableData == DataAvailability::All) {
+        availableData = DataAvailability::Some;
     }
 
-    GeometryCollection polygon;
-    int8_t ccw = 0;
+    ++correlationID;
+    worker.invoke(&GeometryTileWorker::setData, std::move(data_), correlationID);
+    redoLayout();
+}
 
-    for (std::size_t i = 0; i < len; i++) {
-        double area = signedArea(rings[i]);
+void GeometryTile::setPlacementConfig(const PlacementConfig& desiredConfig) {
+    if (placedConfig == desiredConfig) {
+        return;
+    }
 
-        if (area == 0)
+    ++correlationID;
+    worker.invoke(&GeometryTileWorker::setPlacementConfig, desiredConfig, correlationID);
+}
+
+void GeometryTile::redoLayout() {
+    // Mark the tile as pending again if it was complete before to prevent signaling a complete
+    // state despite pending parse operations.
+    if (availableData == DataAvailability::All) {
+        availableData = DataAvailability::Some;
+    }
+
+    std::vector<std::unique_ptr<Layer>> copy;
+
+    for (const Layer* layer : style.getLayers()) {
+        // Avoid cloning and including irrelevant layers.
+        if (layer->is<BackgroundLayer>() ||
+            layer->is<CustomLayer>() ||
+            layer->baseImpl->source != sourceID ||
+            id.overscaledZ < std::floor(layer->baseImpl->minZoom) ||
+            id.overscaledZ >= std::ceil(layer->baseImpl->maxZoom) ||
+            layer->baseImpl->visibility == VisibilityType::None) {
             continue;
-
-        if (ccw == 0)
-            ccw = (area < 0 ? -1 : 1);
-
-        if (ccw == (area < 0 ? -1 : 1) && !polygon.empty()) {
-            polygons.push_back(polygon);
-            polygon.clear();
         }
 
-        polygon.push_back(rings[i]);
+        copy.push_back(layer->baseImpl->clone());
     }
 
-    if (!polygon.empty())
-        polygons.push_back(polygon);
-
-    return polygons;
+    ++correlationID;
+    worker.invoke(&GeometryTileWorker::setLayers, std::move(copy), correlationID);
 }
 
-static Feature::geometry_type convertGeometry(const GeometryTileFeature& geometryTileFeature, const CanonicalTileID& tileID) {
-    const double size = util::EXTENT * std::pow(2, tileID.z);
-    const double x0 = util::EXTENT * tileID.x;
-    const double y0 = util::EXTENT * tileID.y;
+void GeometryTile::onLayout(LayoutResult result) {
+    availableData = DataAvailability::Some;
+    buckets = std::move(result.buckets);
+    featureIndex = std::move(result.featureIndex);
+    data = std::move(result.tileData);
+    observer->onTileChanged(*this);
+}
 
-    auto tileCoordinatesToLatLng = [&] (const Point<int16_t>& p) {
-        double y2 = 180 - (p.y + y0) * 360 / size;
-        return Point<double>(
-            (p.x + x0) * 360 / size - 180,
-            360.0 / M_PI * std::atan(std::exp(y2 * M_PI / 180)) - 90.0
-        );
-    };
+void GeometryTile::onPlacement(PlacementResult result) {
+    if (result.correlationID == correlationID) {
+        availableData = DataAvailability::All;
+    }
+    for (auto& bucket : result.buckets) {
+        buckets[bucket.first] = std::move(bucket.second);
+    }
+    featureIndex->setCollisionTile(std::move(result.collisionTile));
+    placedConfig = result.placedConfig;
+    observer->onTileChanged(*this);
+}
 
-    GeometryCollection geometries = geometryTileFeature.getGeometries();
+void GeometryTile::onError(std::exception_ptr err) {
+    availableData = DataAvailability::All;
+    observer->onTileError(*this, err);
+}
 
-    switch (geometryTileFeature.getType()) {
-        case FeatureType::Unknown: {
-            assert(false);
-            return Point<double>(NAN, NAN);
-        }
-
-        case FeatureType::Point: {
-            MultiPoint<double> multiPoint;
-            for (const auto& p : geometries.at(0)) {
-                multiPoint.push_back(tileCoordinatesToLatLng(p));
-            }
-            if (multiPoint.size() == 1) {
-                return multiPoint[0];
-            } else {
-                return multiPoint;
-            }
-        }
-
-        case FeatureType::LineString: {
-            MultiLineString<double> multiLineString;
-            for (const auto& g : geometries) {
-                LineString<double> lineString;
-                for (const auto& p : g) {
-                    lineString.push_back(tileCoordinatesToLatLng(p));
-                }
-                multiLineString.push_back(std::move(lineString));
-            }
-            if (multiLineString.size() == 1) {
-                return multiLineString[0];
-            } else {
-                return multiLineString;
-            }
-        }
-
-        case FeatureType::Polygon: {
-            MultiPolygon<double> multiPolygon;
-            for (const auto& pg : classifyRings(geometries)) {
-                Polygon<double> polygon;
-                for (const auto& r : pg) {
-                    LinearRing<double> linearRing;
-                    for (const auto& p : r) {
-                        linearRing.push_back(tileCoordinatesToLatLng(p));
-                    }
-                    polygon.push_back(std::move(linearRing));
-                }
-                multiPolygon.push_back(std::move(polygon));
-            }
-            if (multiPolygon.size() == 1) {
-                return multiPolygon[0];
-            } else {
-                return multiPolygon;
-            }
-        }
+Bucket* GeometryTile::getBucket(const Layer& layer) {
+    const auto it = buckets.find(layer.baseImpl->bucketName());
+    if (it == buckets.end()) {
+        return nullptr;
     }
 
-    // Unreachable, but placate GCC.
-    return Point<double>();
+    assert(it->second);
+    return it->second.get();
 }
 
-Feature convertFeature(const GeometryTileFeature& geometryTileFeature, const CanonicalTileID& tileID) {
-    Feature feature { convertGeometry(geometryTileFeature, tileID) };
-    feature.properties = geometryTileFeature.getProperties();
-    feature.id = geometryTileFeature.getID();
-    return feature;
+void GeometryTile::queryRenderedFeatures(
+    std::unordered_map<std::string, std::vector<Feature>>& result,
+    const GeometryCoordinates& queryGeometry,
+    const TransformState& transformState,
+    const optional<std::vector<std::string>>& layerIDs) {
+
+    if (!featureIndex || !data) return;
+
+    featureIndex->query(result,
+                        queryGeometry,
+                        transformState.getAngle(),
+                        util::tileSize * id.overscaleFactor(),
+                        std::pow(2, transformState.getZoom() - id.overscaledZ),
+                        layerIDs,
+                        *data,
+                        id.canonical,
+                        style);
 }
 
 } // namespace mbgl

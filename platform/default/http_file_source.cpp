@@ -4,6 +4,7 @@
 #include <mbgl/platform/log.hpp>
 
 #include <mbgl/util/util.hpp>
+#include <mbgl/util/optional.hpp>
 #include <mbgl/util/run_loop.hpp>
 #include <mbgl/util/string.hpp>
 #include <mbgl/util/timer.hpp>
@@ -63,8 +64,8 @@ public:
 
 class HTTPRequest : public AsyncRequest {
 public:
-    HTTPRequest(HTTPFileSource::Impl*, const Resource&, FileSource::Callback);
-    ~HTTPRequest();
+    HTTPRequest(HTTPFileSource::Impl*, Resource, FileSource::Callback);
+    ~HTTPRequest() override;
 
     void handleResult(CURLcode code);
 
@@ -79,6 +80,9 @@ private:
     // Will store the current response.
     std::shared_ptr<std::string> data;
     std::unique_ptr<Response> response;
+
+    optional<std::string> retryAfter;
+    optional<std::string> xRateLimitReset;
 
     CURL *handle = nullptr;
     curl_slist *headers = nullptr;
@@ -219,10 +223,10 @@ int HTTPFileSource::Impl::startTimeout(CURLM * /* multi */, long timeout_ms, voi
     return 0;
 }
 
-HTTPRequest::HTTPRequest(HTTPFileSource::Impl* context_, const Resource& resource_, FileSource::Callback callback_)
+HTTPRequest::HTTPRequest(HTTPFileSource::Impl* context_, Resource resource_, FileSource::Callback callback_)
     : context(context_),
-      resource(resource_),
-      callback(callback_),
+      resource(std::move(resource_)),
+      callback(std::move(callback_)),
       handle(context->getHandle()) {
 
     // If there's already a response, set the correct etags/modified headers to make sure we are
@@ -325,6 +329,10 @@ size_t HTTPRequest::headerCallback(char *const buffer, const size_t size, const 
     } else if ((begin = headerMatches("expires: ", buffer, length)) != std::string::npos) {
         const std::string value { buffer + begin, length - begin - 2 }; // remove \r\n
         baton->response->expires = Timestamp{ Seconds(curl_getdate(value.c_str(), nullptr)) };
+    } else if ((begin = headerMatches("retry-after: ", buffer, length)) != std::string::npos) {
+        baton->retryAfter = std::string(buffer + begin, length - begin - 2); // remove \r\n
+    } else if ((begin = headerMatches("x-rate-limit-reset: ", buffer, length)) != std::string::npos) {
+        baton->xRateLimitReset = std::string(buffer + begin, length - begin - 2); // remove \r\n
     }
 
     return length;
@@ -372,6 +380,10 @@ void HTTPRequest::handleResult(CURLcode code) {
         } else if (responseCode == 404) {
             response->error =
                 std::make_unique<Error>(Error::Reason::NotFound, "HTTP status code 404");
+        } else if (responseCode == 429) {
+            response->error =
+                std::make_unique<Error>(Error::Reason::RateLimit, "HTTP status code 429",
+                                        http::parseRetryHeaders(retryAfter, xRateLimitReset));
         } else if (responseCode >= 500 && responseCode < 600) {
             response->error =
                 std::make_unique<Error>(Error::Reason::Server, std::string{ "HTTP status code " } +

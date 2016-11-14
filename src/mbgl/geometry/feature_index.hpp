@@ -1,6 +1,7 @@
 #pragma once
 
-#include <mbgl/tile/geometry_tile.hpp>
+#include <mbgl/style/types.hpp>
+#include <mbgl/tile/geometry_tile_data.hpp>
 #include <mbgl/util/grid_index.hpp>
 #include <mbgl/util/feature.hpp>
 
@@ -10,9 +11,11 @@
 
 namespace mbgl {
 
+namespace style {
 class Style;
+} // namespace style
+
 class CollisionTile;
-enum class TranslateAnchorType : bool;
 class CanonicalTileID;
 
 class IndexedSubfeature {
@@ -32,19 +35,19 @@ public:
 
     void query(
             std::unordered_map<std::string, std::vector<Feature>>& result,
-            const GeometryCollection& queryGeometry,
+            const GeometryCoordinates& queryGeometry,
             const float bearing,
             const double tileSize,
             const double scale,
             const optional<std::vector<std::string>>& layerIDs,
-            const GeometryTile&,
+            const GeometryTileData&,
             const CanonicalTileID&,
-            const Style&) const;
+            const style::Style&) const;
 
-    static optional<GeometryCollection> translateQueryGeometry(
-            const GeometryCollection& queryGeometry,
+    static optional<GeometryCoordinates> translateQueryGeometry(
+            const GeometryCoordinates& queryGeometry,
             const std::array<float, 2>& translate,
-            const TranslateAnchorType,
+            const style::TranslateAnchorType,
             const float bearing,
             const float pixelsToTileUnits);
 
@@ -56,11 +59,11 @@ private:
     void addFeature(
             std::unordered_map<std::string, std::vector<Feature>>& result,
             const IndexedSubfeature&,
-            const GeometryCollection& queryGeometry,
+            const GeometryCoordinates& queryGeometry,
             const optional<std::vector<std::string>>& filterLayerIDs,
-            const GeometryTile&,
+            const GeometryTileData&,
             const CanonicalTileID&,
-            const Style&,
+            const style::Style&,
             const float bearing,
             const float pixelsToTileUnits) const;
 
@@ -70,4 +73,4 @@ private:
 
     std::unordered_map<std::string, std::vector<std::string>> bucketLayerIDs;
 };
-}
+} // namespace mbgl

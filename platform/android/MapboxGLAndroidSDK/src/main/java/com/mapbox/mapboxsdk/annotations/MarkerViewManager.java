@@ -2,19 +2,19 @@ package com.mapbox.mapboxsdk.annotations;
 
 import android.content.Context;
 import android.graphics.PointF;
+import android.graphics.RectF;
 import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.support.v4.util.Pools;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
 import com.mapbox.mapboxsdk.R;
+import com.mapbox.mapboxsdk.constants.MapboxConstants;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
-import com.mapbox.mapboxsdk.maps.Projection;
 import com.mapbox.mapboxsdk.utils.AnimatorUtils;
 
 import java.util.ArrayList;
@@ -71,6 +71,19 @@ public class MarkerViewManager {
     }
 
     /**
+     * Animate a MarkerView with a given rotation.
+     *
+     * @param marker   the MarkerView to rotate by
+     * @param rotation the rotation by value
+     */
+    public void animateRotationBy(@NonNull MarkerView marker, float rotation) {
+        View convertView = markerViewMap.get(marker);
+        if (convertView != null) {
+            AnimatorUtils.rotateBy(convertView, rotation);
+        }
+    }
+
+    /**
      * Animate a MarkerView to a given alpha value.
      * <p>
      * The {@link MarkerView} will be transformed from its current alpha value to the given value.
@@ -111,24 +124,32 @@ public class MarkerViewManager {
      * </p>
      */
     public void update() {
-        View convertView;
-        for (MarkerView marker : markerViewMap.keySet()) {
-            convertView = markerViewMap.get(marker);
+        for (final MarkerView marker : markerViewMap.keySet()) {
+            final View convertView = markerViewMap.get(marker);
             if (convertView != null) {
                 PointF point = mapboxMap.getProjection().toScreenLocation(marker.getPosition());
-                int x = (int) (marker.getAnchorU() * convertView.getMeasuredWidth());
-                int y = (int) (marker.getAnchorV() * convertView.getMeasuredHeight());
+                if (marker.getOffsetX() == MapboxConstants.UNMEASURED) {
+                    // ensure view is measured first
+                    if (marker.getWidth() == 0) {
+                        convertView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+                        if (convertView.getMeasuredWidth() != 0) {
+                            marker.setWidth(convertView.getMeasuredWidth());
+                            marker.setHeight(convertView.getMeasuredHeight());
+                        }
+                    }
+                }
+                if (marker.getWidth() != 0) {
+                    int x = (int) (marker.getAnchorU() * marker.getWidth());
+                    int y = (int) (marker.getAnchorV() * marker.getHeight());
+                    marker.setOffset(x, y);
+                }
 
-                marker.setOffsetX(x);
-                marker.setOffsetY(y);
+                convertView.setX(point.x - marker.getOffsetX());
+                convertView.setY(point.y - marker.getOffsetY());
 
-                convertView.setX(point.x - x);
-                convertView.setY(point.y - y);
-
+                // animate visibility
                 if (marker.isVisible() && convertView.getVisibility() == View.GONE) {
-                    convertView.animate().cancel();
-                    convertView.setAlpha(0);
-                    AnimatorUtils.alpha(convertView, 1);
+                    animateVisible(marker, true);
                 }
             }
         }
@@ -153,7 +174,9 @@ public class MarkerViewManager {
     }
 
     /**
+     * Update and invalidate the MarkerView icon.
      *
+     * @param markerView the marker view to updates
      */
     public void updateIcon(@NonNull MarkerView markerView) {
         View convertView = markerViewMap.get(markerView);
@@ -171,6 +194,19 @@ public class MarkerViewManager {
      * @param marker the MarkerView to deselect
      */
     public void deselect(@NonNull MarkerView marker) {
+        deselect(marker, true);
+    }
+
+    /**
+     * Animate a MarkerView to a deselected state.
+     * <p>
+     * The {@link com.mapbox.mapboxsdk.maps.MapboxMap.MarkerViewAdapter#onDeselect(MarkerView, View)} will be called to execute an animation.
+     * </p>
+     *
+     * @param marker        the MarkerView to deselect
+     * @param callbackToMap indicates if deselect marker must be called on MapboxMap
+     */
+    public void deselect(@NonNull MarkerView marker, boolean callbackToMap) {
         final View convertView = markerViewMap.get(marker);
         if (convertView != null) {
             for (MapboxMap.MarkerViewAdapter adapter : markerViewAdapters) {
@@ -178,6 +214,10 @@ public class MarkerViewManager {
                     adapter.onDeselect(marker, convertView);
                 }
             }
+            if (callbackToMap) {
+                mapboxMap.deselectMarker(marker);
+            }
+            marker.setSelected(false);
         }
     }
 
@@ -187,10 +227,20 @@ public class MarkerViewManager {
      * @param marker the MarkerView object to select
      */
     public void select(@NonNull MarkerView marker) {
+        select(marker, true);
+    }
+
+    /**
+     * Animate a MarkerView to a selected state.
+     *
+     * @param marker        the MarkerView object to select
+     * @param callbackToMap indicates if select marker must be called on MapboxMap
+     */
+    public void select(@NonNull MarkerView marker, boolean callbackToMap) {
         final View convertView = markerViewMap.get(marker);
         for (MapboxMap.MarkerViewAdapter adapter : markerViewAdapters) {
             if (adapter.getMarkerClass().equals(marker.getClass())) {
-                select(marker, convertView, adapter);
+                select(marker, convertView, adapter, callbackToMap);
             }
         }
     }
@@ -200,16 +250,36 @@ public class MarkerViewManager {
      * <p>
      * The {@link com.mapbox.mapboxsdk.maps.MapboxMap.MarkerViewAdapter#onSelect(MarkerView, View, boolean)} will be called to execute an animation.
      * </p>
-     * @param marker the MarkerView object to select
+     *
+     * @param marker      the MarkerView object to select
      * @param convertView the View presentation of the MarkerView
-     * @param adapter the adapter used to adapt the marker to the convertView
+     * @param adapter     the adapter used to adapt the marker to the convertView
      */
     public void select(@NonNull MarkerView marker, View convertView, MapboxMap.MarkerViewAdapter adapter) {
+        select(marker, convertView, adapter, true);
+    }
+
+
+    /**
+     * Animate a MarkerView to a selected state.
+     * <p>
+     * The {@link com.mapbox.mapboxsdk.maps.MapboxMap.MarkerViewAdapter#onSelect(MarkerView, View, boolean)} will be called to execute an animation.
+     * </p>
+     *
+     * @param marker        the MarkerView object to select
+     * @param convertView   the View presentation of the MarkerView
+     * @param adapter       the adapter used to adapt the marker to the convertView
+     * @param callbackToMap indicates if select marker must be called on MapboxMap
+     */
+    public void select(@NonNull MarkerView marker, View convertView, MapboxMap.MarkerViewAdapter adapter, boolean callbackToMap) {
         if (convertView != null) {
             if (adapter.onSelect(marker, convertView, false)) {
-                mapboxMap.selectMarker(marker);
+                if (callbackToMap) {
+                    mapboxMap.selectMarker(marker);
+                }
             }
             marker.setSelected(true);
+            convertView.bringToFront();
         }
     }
 
@@ -225,6 +295,17 @@ public class MarkerViewManager {
     @Nullable
     public View getView(MarkerView marker) {
         return markerViewMap.get(marker);
+    }
+
+    @Nullable
+    public MapboxMap.MarkerViewAdapter getViewAdapter(MarkerView markerView) {
+        MapboxMap.MarkerViewAdapter adapter = null;
+        for (MapboxMap.MarkerViewAdapter a : markerViewAdapters) {
+            if (a.getMarkerClass().equals(markerView.getClass())) {
+                adapter = a;
+            }
+        }
+        return adapter;
     }
 
     /**
@@ -244,11 +325,14 @@ public class MarkerViewManager {
             for (final MapboxMap.MarkerViewAdapter<?> adapter : markerViewAdapters) {
                 if (adapter.getMarkerClass().equals(marker.getClass())) {
                     if (adapter.prepareViewForReuse(marker, viewHolder)) {
+                        // reset offset for reuse
+                        marker.setOffset(MapboxConstants.UNMEASURED, MapboxConstants.UNMEASURED);
                         adapter.releaseView(viewHolder);
                     }
                 }
             }
         }
+        marker.setMapboxMap(null);
         markerViewMap.remove(marker);
     }
 
@@ -267,7 +351,7 @@ public class MarkerViewManager {
 
         if (!markerViewAdapters.contains(markerViewAdapter)) {
             markerViewAdapters.add(markerViewAdapter);
-            invalidateViewMarkersInBounds();
+            invalidateViewMarkersInVisibleRegion();
         }
     }
 
@@ -292,7 +376,7 @@ public class MarkerViewManager {
     /**
      * Schedule that ViewMarkers found in the viewport are invalidated.
      * <p>
-     * This method is rate limited, and {@link #invalidateViewMarkersInBounds} will only be called
+     * This method is rate limited, and {@link #invalidateViewMarkersInVisibleRegion} will only be called
      * once each 250 ms.
      * </p>
      */
@@ -302,7 +386,7 @@ public class MarkerViewManager {
             if (currentTime < viewMarkerBoundsUpdateTime) {
                 return;
             }
-            invalidateViewMarkersInBounds();
+            invalidateViewMarkersInVisibleRegion();
             viewMarkerBoundsUpdateTime = currentTime + 250;
         }
     }
@@ -314,22 +398,23 @@ public class MarkerViewManager {
      * ones for each found Marker in the changed viewport.
      * </p>
      */
-    public void invalidateViewMarkersInBounds() {
-        Projection projection = mapboxMap.getProjection();
-        List<MarkerView> markers = mapView.getMarkerViewsInBounds(projection.getVisibleRegion().latLngBounds);
+    public void invalidateViewMarkersInVisibleRegion() {
+        RectF mapViewRect = new RectF(0, 0, mapView.getWidth(), mapView.getHeight());
+        List<MarkerView> markers = mapView.getMarkerViewsInRect(mapViewRect);
         View convertView;
 
         // remove old markers
         Iterator<MarkerView> iterator = markerViewMap.keySet().iterator();
         while (iterator.hasNext()) {
-            MarkerView m = iterator.next();
-            if (!markers.contains(m)) {
+            MarkerView marker = iterator.next();
+            if (!markers.contains(marker)) {
                 // remove marker
-                convertView = markerViewMap.get(m);
+                convertView = markerViewMap.get(marker);
                 for (MapboxMap.MarkerViewAdapter adapter : markerViewAdapters) {
-                    if (adapter.getMarkerClass().equals(m.getClass())) {
-                        adapter.prepareViewForReuse(m, convertView);
+                    if (adapter.getMarkerClass().equals(marker.getClass())) {
+                        adapter.prepareViewForReuse(marker, convertView);
                         adapter.releaseView(convertView);
+                        marker.setMapboxMap(null);
                         iterator.remove();
                     }
                 }
@@ -341,21 +426,15 @@ public class MarkerViewManager {
             if (!markerViewMap.containsKey(marker)) {
                 for (final MapboxMap.MarkerViewAdapter adapter : markerViewAdapters) {
                     if (adapter.getMarkerClass().equals(marker.getClass())) {
+
+                        // Inflate View
                         convertView = (View) adapter.getViewReusePool().acquire();
                         final View adaptedView = adapter.getView(marker, convertView, mapView);
                         if (adaptedView != null) {
-
-                            // tilt
                             adaptedView.setRotationX(marker.getTilt());
-
-                            // rotation
                             adaptedView.setRotation(marker.getRotation());
-
-                            // alpha
                             adaptedView.setAlpha(marker.getAlpha());
-
-                            // visible
-                            adaptedView.setVisibility(marker.isVisible() ? View.VISIBLE : View.GONE);
+                            adaptedView.setVisibility(View.GONE);
 
                             if (mapboxMap.getSelectedMarkers().contains(marker)) {
                                 // if a marker to be shown was selected
@@ -365,33 +444,79 @@ public class MarkerViewManager {
                                 }
                             }
 
-                            adaptedView.setOnClickListener(new View.OnClickListener() {
-                                @Override
-                                public void onClick(final View v) {
-                                    boolean clickHandled = false;
-                                    if (onMarkerViewClickListener != null) {
-                                        clickHandled = onMarkerViewClickListener.onMarkerClick(marker, v, adapter);
-                                    }
-
-                                    if (!clickHandled) {
-                                        // InfoWindow offset
-                                        int infoWindowOffsetX = (int) ((adaptedView.getWidth() * marker.getInfoWindowAnchorU()) - marker.getOffsetX());
-                                        int infoWindowOffsetY = (int) ((adaptedView.getHeight() * marker.getInfoWindowAnchorV()) - marker.getOffsetY());
-                                        marker.setTopOffsetPixels(infoWindowOffsetY);
-                                        marker.setRightOffsetPixels(infoWindowOffsetX);
-                                        select(marker, v, adapter);
-                                    }
-                                }
-                            });
-
+                            marker.setMapboxMap(mapboxMap);
                             markerViewMap.put(marker, adaptedView);
                             if (convertView == null) {
-                                mapView.addView(adaptedView);
+                                adaptedView.setVisibility(View.GONE);
+                                mapView.getMarkerViewContainer().addView(adaptedView);
                             }
                         }
                     }
                 }
             }
+        }
+        // trigger update to make newly added ViewMarker visible,
+        // these would only be updated when the map is moved.
+        update();
+    }
+
+    public void onClickMarkerView(MarkerView markerView) {
+        boolean clickHandled = false;
+
+        MapboxMap.MarkerViewAdapter adapter = getViewAdapter(markerView);
+        View view = getView(markerView);
+        if (adapter == null || view == null) {
+            // not a valid state
+            return;
+        }
+
+        if (onMarkerViewClickListener != null) {
+            clickHandled = onMarkerViewClickListener.onMarkerClick(markerView, view, adapter);
+        }
+
+        if (!clickHandled) {
+            ensureInfoWindowOffset(markerView);
+            select(markerView, view, adapter);
+        }
+    }
+
+    //TODO: This whole method is a stopgap for: https://github.com/mapbox/mapbox-gl-native/issues/5384
+    public void ensureInfoWindowOffset(MarkerView marker) {
+        View view = null;
+        if (markerViewMap.containsKey(marker)) {
+            view = markerViewMap.get(marker);
+        } else {
+            for (final MapboxMap.MarkerViewAdapter adapter : markerViewAdapters) {
+                if (adapter.getMarkerClass().equals(marker.getClass())) {
+                    View convertView = (View) adapter.getViewReusePool().acquire();
+                    view = adapter.getView(marker, convertView, mapView);
+                    break;
+                }
+            }
+        }
+
+        if (view != null) {
+            if (marker.getWidth() == 0) {
+                if(view.getMeasuredWidth()==0) {
+                    //Ensure the marker's view is measured first
+                    view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+                }
+                marker.setWidth(view.getMeasuredWidth());
+                marker.setHeight(view.getMeasuredHeight());
+            }
+
+            // update position on map
+            if (marker.getOffsetX() == MapboxConstants.UNMEASURED) {
+                int x = (int) (marker.getAnchorU() * marker.getWidth());
+                int y = (int) (marker.getAnchorV() * marker.getHeight());
+                marker.setOffset(x, y);
+            }
+
+            // InfoWindow offset
+            int infoWindowOffsetX = (int) ((view.getMeasuredWidth() * marker.getInfoWindowAnchorU()) - marker.getOffsetX());
+            int infoWindowOffsetY = (int) ((view.getMeasuredHeight() * marker.getInfoWindowAnchorV()) - marker.getOffsetY());
+            marker.setTopOffsetPixels(infoWindowOffsetY);
+            marker.setRightOffsetPixels(infoWindowOffsetX);
         }
     }
 

@@ -22,8 +22,8 @@ enum OpenFlag : int {
 };
 
 struct Exception : std::runtime_error {
-    inline Exception(int err, const char *msg) : std::runtime_error(msg), code(err) {}
-    inline Exception(int err, const std::string& msg) : std::runtime_error(msg), code(err) {}
+    Exception(int err, const char *msg) : std::runtime_error(msg), code(err) {}
+    Exception(int err, const std::string& msg) : std::runtime_error(msg), code(err) {}
     const int code = 0;
 };
 
@@ -42,6 +42,7 @@ public:
 
     explicit operator bool() const;
 
+    static void errorLogCallback(void *arg, const int err, const char *msg);
     void setBusyTimeout(std::chrono::milliseconds);
     void exec(const std::string &sql);
     Statement prepare(const char *query);

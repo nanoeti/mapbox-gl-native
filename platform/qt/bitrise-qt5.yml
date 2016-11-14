@@ -29,22 +29,34 @@ workflows:
         - content: |-
             #!/bin/bash
             set -eu -o pipefail
+            sudo chown -R $USER /usr/local
+            brew install cmake
             brew install qt5
             brew link qt5 --force
             brew linkapps qt5
+            export HOMEBREW_QT5_VERSION=$(brew list --versions qt5 | rev | cut -d' ' -f1 | rev)
+            ln -s /usr/local/Cellar/qt5/$HOMEBREW_QT5_VERSION/mkspecs /usr/local/mkspecs
+            ln -s /usr/local/Cellar/qt5/$HOMEBREW_QT5_VERSION/plugins /usr/local/plugins
             export BUILDTYPE=Debug
             make qt-app
             make qt-qml-app
-            make test-qt
+            make run-qt-test
         - is_debug: 'yes'
+    - deploy-to-bitrise-io:
+        title: Deploy to Bitrise.io
+        run_if: '{{enveq "SKIPCI" "false"}}'
+        inputs:
+        - deploy_path: "test/fixtures"
+        - notify_user_groups: none
+        - is_compress: 'true'
     - slack:
         title: Post to Slack
         run_if: '{{enveq "SKIPCI" "false"}}'
         inputs:
         - webhook_url: "$SLACK_HOOK_URL"
         - channel: "#gl-bots"
-        - from_username: 'Bitrise Qt5 OS X'
-        - from_username_on_error: 'Bitrise Qt5 OS X'
+        - from_username: 'Bitrise Qt5 macOS'
+        - from_username_on_error: 'Bitrise Qt5 macOS'
         - message: '<${BITRISE_BUILD_URL}|Build #${BITRISE_BUILD_NUMBER}>
             for <https://github.com/mapbox/mapbox-gl-native/compare/${BITRISE_GIT_BRANCH}|mapbox/mapbox-gl-native@${BITRISE_GIT_BRANCH}>
             by ${GIT_CLONE_COMMIT_COMMITER_NAME}

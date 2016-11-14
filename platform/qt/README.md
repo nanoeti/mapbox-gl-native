@@ -1,6 +1,7 @@
 # Mapbox Qt SDK
 
 [![Travis](https://travis-ci.org/mapbox/mapbox-gl-native.svg?branch=master)](https://travis-ci.org/mapbox/mapbox-gl-native/builds)
+[![Bitrise](https://www.bitrise.io/app/96cfbc97e0245c22.svg?token=GxsqIOGPXhn0F23sSVSsYA&branch=master)](https://www.bitrise.io/app/96cfbc97e0245c22)
 
 Provides [Qt](http://www.qt.io/) example applications and APIs via `QMapboxGL`
 and `QQuickMapboxGL`:
@@ -18,7 +19,7 @@ example](https://c2.staticflickr.com/8/7689/26247088394_01541b34de_o.png)
 ### Developing
 
 [Qt supports many platforms](https://www.qt.io/qt-framework/#section-4) - so far
-we have been testing our code on Linux and OS X desktops, as well as embedded
+we have been testing our code on Linux and macOS desktops, as well as embedded
 devices such as Raspberry Pi 3.
 
 If you need to maintain backwards compatibility with prior releases of
@@ -29,6 +30,10 @@ token](https://www.mapbox.com/help/define-access-token/) at runtime - you need
 to provide it by setting the environment variable `MAPBOX_ACCESS_TOKEN`:
 
     export MAPBOX_ACCESS_TOKEN=MYTOKEN
+
+Optionally, you can specify a custom style to the QMapboxGL example application:
+
+    export MAPBOX_STYLE_URL=MYSTYLEURL
 
 #### Using QMapboxGL
 
@@ -46,11 +51,15 @@ you also need:
     qml-module-qtquick2 qml-module-qtpositioning qml-module-qtgraphicaleffects \
     qml-module-qtquick-layouts qml-module-qtquick-controls
 
-#### OS X
+#### macOS
 
-For OS X desktop, you can install Qt 5 via [Homebrew](http://brew.sh):
+For macOS desktop, you can install Qt 5 via [Homebrew](http://brew.sh):
 
     brew install qt5
+
+Since Homebrew doesn't add Qt to the path, you'll have to do that manually before running any Make target:
+
+    export PATH=/usr/local/opt/qt5:$PATH
 
 We provide the following build targets for our Qt SDK:
 

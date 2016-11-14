@@ -24,15 +24,19 @@ import java.io.InputStream;
 
 /**
  * Factory for creating {@link Icon} objects.
+ *
  * @see Icon
  */
 public final class IconFactory {
 
     private static final String ICON_ID_PREFIX = "com.mapbox.icons.icon_";
+    public static final Bitmap ICON_MARKERVIEW_BITMAP = Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8);
+    public static final String ICON_MARKERVIEW_ID = ICON_ID_PREFIX + "marker_view";
 
     private Context mContext;
     private static IconFactory sInstance;
     private Icon mDefaultMarker;
+    private Icon mDefaultMarkerView;
     private BitmapFactory.Options mOptions;
 
     private int mNextId = 0;
@@ -119,6 +123,13 @@ public final class IconFactory {
             mDefaultMarker = fromResource(R.drawable.default_marker);
         }
         return mDefaultMarker;
+    }
+
+    public Icon defaultMarkerView() {
+        if (mDefaultMarkerView == null) {
+            mDefaultMarkerView = fromResource(R.drawable.default_markerview);
+        }
+        return mDefaultMarkerView;
     }
 
     private Icon fromInputStream(@NonNull InputStream is) {

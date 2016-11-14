@@ -2,14 +2,30 @@
 #include <mbgl/annotation/annotation_manager.hpp>
 #include <mbgl/util/constants.hpp>
 #include <mbgl/storage/file_source.hpp>
+#include <mbgl/style/update_parameters.hpp>
 
 #include <utility>
 
 namespace mbgl {
 
-AnnotationTileFeature::AnnotationTileFeature(FeatureType type_, GeometryCollection geometries_,
-                                 std::unordered_map<std::string, std::string> properties_)
-    : type(type_),
+AnnotationTile::AnnotationTile(const OverscaledTileID& overscaledTileID,
+                               const style::UpdateParameters& parameters)
+    : GeometryTile(overscaledTileID, AnnotationManager::SourceID, parameters),
+      annotationManager(parameters.annotationManager) {
+    annotationManager.addTile(*this);
+}
+
+AnnotationTile::~AnnotationTile() {
+    annotationManager.removeTile(*this);
+}
+
+void AnnotationTile::setNecessity(Necessity) {}
+
+AnnotationTileFeature::AnnotationTileFeature(const AnnotationID id_,
+                                             FeatureType type_, GeometryCollection geometries_,
+                                             std::unordered_map<std::string, std::string> properties_)
+    : id(id_),
+      type(type_),
       properties(std::move(properties_)),
       geometries(std::move(geometries_)) {}
 
@@ -21,31 +37,19 @@ optional<Value> AnnotationTileFeature::getValue(const std::string& key) const {
     return optional<Value>();
 }
 
-util::ptr<GeometryTileLayer> AnnotationTile::getLayer(const std::string& name) const {
+AnnotationTileLayer::AnnotationTileLayer(std::string name_)
+    : name(std::move(name_)) {}
+
+std::unique_ptr<GeometryTileData> AnnotationTileData::clone() const {
+    return std::make_unique<AnnotationTileData>(*this);
+}
+
+const GeometryTileLayer* AnnotationTileData::getLayer(const std::string& name) const {
     auto it = layers.find(name);
     if (it != layers.end()) {
-        return it->second;
+        return &it->second;
     }
     return nullptr;
-}
-
-AnnotationTileMonitor::AnnotationTileMonitor(const OverscaledTileID& tileID_, AnnotationManager& annotationManager_)
-    : tileID(tileID_),
-      annotationManager(annotationManager_) {
-}
-
-AnnotationTileMonitor::~AnnotationTileMonitor() {
-    annotationManager.removeTileMonitor(*this);
-}
-
-std::unique_ptr<AsyncRequest> AnnotationTileMonitor::monitorTile(const GeometryTileMonitor::Callback& callback_) {
-    callback = callback_;
-    annotationManager.addTileMonitor(*this);
-    return nullptr;
-}
-
-void AnnotationTileMonitor::update(std::unique_ptr<GeometryTile> tile) {
-    callback(nullptr, std::move(tile), {}, {});
 }
 
 } // namespace mbgl

@@ -1,97 +1,88 @@
 #pragma once
 
-#include <mbgl/util/geometry.hpp>
+#include <mbgl/tile/tile.hpp>
+#include <mbgl/tile/geometry_tile_worker.hpp>
+#include <mbgl/text/placement_config.hpp>
 #include <mbgl/util/feature.hpp>
-#include <mbgl/util/chrono.hpp>
-#include <mbgl/util/ptr.hpp>
-#include <mbgl/util/noncopyable.hpp>
-#include <mbgl/util/optional.hpp>
-#include <mbgl/util/variant.hpp>
-#include <mbgl/util/constants.hpp>
+#include <mbgl/actor/actor.hpp>
 
-#include <cstdint>
-#include <string>
-#include <vector>
+#include <atomic>
+#include <memory>
 #include <unordered_map>
-#include <functional>
+#include <vector>
 
 namespace mbgl {
 
-enum class FeatureType : uint8_t {
-    Unknown = 0,
-    Point = 1,
-    LineString = 2,
-    Polygon = 3
-};
+class GeometryTileData;
+class FeatureIndex;
+class CollisionTile;
 
-class CanonicalTileID;
+namespace style {
+class Style;
+class Layer;
+class UpdateParameters;
+} // namespace style
 
-// Normalized vector tile coordinates.
-// Each geometry coordinate represents a point in a bidimensional space,
-// varying from -V...0...+V, where V is the maximum extent applicable.
-using GeometryCoordinate = Point<int16_t>;
-
-class GeometryCoordinates : public std::vector<GeometryCoordinate> {
+class GeometryTile : public Tile {
 public:
-    using coordinate_type = int16_t;
-    using std::vector<GeometryCoordinate>::vector;
+    GeometryTile(const OverscaledTileID&,
+                 std::string sourceID,
+                 const style::UpdateParameters&);
+
+    ~GeometryTile() override;
+
+    void setError(std::exception_ptr);
+    void setData(std::unique_ptr<const GeometryTileData>);
+
+    void setPlacementConfig(const PlacementConfig&) override;
+    void redoLayout() override;
+
+    Bucket* getBucket(const style::Layer&) override;
+
+    void queryRenderedFeatures(
+            std::unordered_map<std::string, std::vector<Feature>>& result,
+            const GeometryCoordinates& queryGeometry,
+            const TransformState&,
+            const optional<std::vector<std::string>>& layerIDs) override;
+
+    void cancel() override;
+
+    class LayoutResult {
+    public:
+        std::unordered_map<std::string, std::unique_ptr<Bucket>> buckets;
+        std::unique_ptr<FeatureIndex> featureIndex;
+        std::unique_ptr<GeometryTileData> tileData;
+        uint64_t correlationID;
+    };
+    void onLayout(LayoutResult);
+
+    class PlacementResult {
+    public:
+        std::unordered_map<std::string, std::unique_ptr<Bucket>> buckets;
+        std::unique_ptr<CollisionTile> collisionTile;
+        PlacementConfig placedConfig;
+        uint64_t correlationID;
+    };
+    void onPlacement(PlacementResult);
+
+    void onError(std::exception_ptr);
+
+private:
+    const std::string sourceID;
+    style::Style& style;
+
+    // Used to signal the worker that it should abandon parsing this tile as soon as possible.
+    std::atomic<bool> obsolete { false };
+
+    std::shared_ptr<Mailbox> mailbox;
+    Actor<GeometryTileWorker> worker;
+
+    uint64_t correlationID = 0;
+    optional<PlacementConfig> placedConfig;
+
+    std::unordered_map<std::string, std::unique_ptr<Bucket>> buckets;
+    std::unique_ptr<FeatureIndex> featureIndex;
+    std::unique_ptr<const GeometryTileData> data;
 };
-
-class GeometryCollection : public std::vector<GeometryCoordinates> {
-public:
-    using coordinate_type = int16_t;
-    using std::vector<GeometryCoordinates>::vector;
-};
-
-class GeometryTileFeature : private util::noncopyable {
-public:
-    virtual ~GeometryTileFeature() = default;
-    virtual FeatureType getType() const = 0;
-    virtual optional<Value> getValue(const std::string& key) const = 0;
-    virtual Feature::property_map getProperties() const { return Feature::property_map(); }
-    virtual optional<uint64_t> getID() const { return {}; }
-    virtual GeometryCollection getGeometries() const = 0;
-};
-
-class GeometryTileLayer : private util::noncopyable {
-public:
-    virtual ~GeometryTileLayer() = default;
-    virtual std::size_t featureCount() const = 0;
-    virtual util::ptr<const GeometryTileFeature> getFeature(std::size_t) const = 0;
-    virtual std::string getName() const = 0;
-};
-
-class GeometryTile : private util::noncopyable {
-public:
-    virtual ~GeometryTile() = default;
-    virtual util::ptr<GeometryTileLayer> getLayer(const std::string&) const = 0;
-};
-
-class AsyncRequest;
-
-class GeometryTileMonitor : private util::noncopyable {
-public:
-    virtual ~GeometryTileMonitor() = default;
-
-    using Callback = std::function<void (std::exception_ptr,
-                                         std::unique_ptr<GeometryTile>,
-                                         optional<Timestamp> modified,
-                                         optional<Timestamp> expires)>;
-    /*
-     * Monitor the tile held by this object for changes. When the tile is loaded for the first time,
-     * or updates, the callback is executed. If an error occurs, the first parameter will be set.
-     * Otherwise it will be null. If there is no data for the requested tile, the second parameter
-     * will be null.
-     *
-     * To cease monitoring, release the returned Request.
-     */
-    virtual std::unique_ptr<AsyncRequest> monitorTile(const Callback&) = 0;
-};
-
-// classifies an array of rings into polygons with outer rings and holes
-std::vector<GeometryCollection> classifyRings(const GeometryCollection&);
-
-// convert from GeometryTileFeature to Feature (eventually we should eliminate GeometryTileFeature)
-Feature convertFeature(const GeometryTileFeature&, const CanonicalTileID&);
 
 } // namespace mbgl

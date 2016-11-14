@@ -26,6 +26,13 @@ public:
                       uint64_t maximumCacheSize = util::DEFAULT_MAX_CACHE_SIZE);
     ~DefaultFileSource() override;
 
+    bool supportsOptionalRequests() const override {
+        return true;
+    }
+    
+    void setAPIBaseURL(const std::string&);
+    std::string getAPIBaseURL() const;
+
     void setAccessToken(const std::string&);
     std::string getAccessToken() const;
 
@@ -57,6 +64,13 @@ public:
                              std::function<void (std::exception_ptr,
                                                  optional<OfflineRegion>)>);
 
+    /*
+     * Update an offline region metadata in the database.
+     */
+    void updateOfflineMetadata(const int64_t regionID,
+                               const OfflineRegionMetadata& metadata,
+                               std::function<void (std::exception_ptr,
+                                                   optional<OfflineRegionMetadata>)>);
     /*
      * Register an observer to be notified when the state of the region changes.
      */
@@ -107,6 +121,7 @@ public:
 private:
     const std::unique_ptr<util::Thread<Impl>> thread;
     const std::unique_ptr<FileSource> assetFileSource;
+    const std::unique_ptr<FileSource> localFileSource;
 };
 
 } // namespace mbgl

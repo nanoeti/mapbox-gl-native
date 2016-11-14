@@ -1,12 +1,10 @@
 package com.mapbox.mapboxsdk.annotations;
 
-import android.graphics.Bitmap;
 import android.support.annotation.FloatRange;
-import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.view.View;
 
 import com.mapbox.mapboxsdk.constants.MapboxConstants;
+import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 
 /**
@@ -23,11 +21,14 @@ public class MarkerView extends Marker {
 
     private MarkerViewManager markerViewManager;
 
+    private float width;
+    private float height;
+
     private float anchorU;
     private float anchorV;
 
-    private float offsetX;
-    private float offsetY;
+    private float offsetX = MapboxConstants.UNMEASURED;
+    private float offsetY = MapboxConstants.UNMEASURED;
 
     private float infoWindowAnchorU;
     private float infoWindowAnchorV;
@@ -43,6 +44,7 @@ public class MarkerView extends Marker {
 
     private boolean selected;
 
+
     /**
      * Publicly hidden default constructor
      */
@@ -56,16 +58,30 @@ public class MarkerView extends Marker {
      */
     public MarkerView(BaseMarkerViewOptions baseMarkerViewOptions) {
         super(baseMarkerViewOptions);
+        this.alpha = baseMarkerViewOptions.getAlpha();
         this.anchorU = baseMarkerViewOptions.getAnchorU();
         this.anchorV = baseMarkerViewOptions.getAnchorV();
         this.infoWindowAnchorU = baseMarkerViewOptions.getInfoWindowAnchorU();
         this.infoWindowAnchorV = baseMarkerViewOptions.getInfoWindowAnchorV();
         this.flat = baseMarkerViewOptions.isFlat();
-        this.infoWindowAnchorU = baseMarkerViewOptions.infoWindowAnchorU;
-        this.infoWindowAnchorV = baseMarkerViewOptions.infoWindowAnchorV;
-        this.anchorU = baseMarkerViewOptions.anchorU;
-        this.anchorV = baseMarkerViewOptions.anchorV;
+        this.rotation = baseMarkerViewOptions.getRotation();
         this.selected = baseMarkerViewOptions.selected;
+    }
+
+    float getWidth() {
+        return width;
+    }
+
+    void setWidth(float width) {
+        this.width = width;
+    }
+
+    float getHeight() {
+        return height;
+    }
+
+    void setHeight(float height) {
+        this.height = height;
     }
 
     /**
@@ -81,6 +97,7 @@ public class MarkerView extends Marker {
     public void setAnchor(@FloatRange(from = 0.0, to = 1.0) float u, @FloatRange(from = 0.0, to = 1.0) float v) {
         this.anchorU = u;
         this.anchorV = v;
+        setOffset(-1, -1);
     }
 
     /**
@@ -102,26 +119,16 @@ public class MarkerView extends Marker {
     }
 
     /**
-     * Internal method to set the horizontal calculated offset.
+     * Internal method to set the calculated offset.
      * <p>
      * These are calculated based on the View bounds and the provided anchor.
      * </p>
      *
      * @param x the x-value of the offset
-     */
-    void setOffsetX(float x) {
-        offsetX = x;
-    }
-
-    /**
-     * Internal method to set the vertical calculated offset.
-     * <p>
-     * These are calculated based on the View bounds and the provided anchor.
-     * </p>
-     *
      * @param y the y-value of the offset
      */
-    void setOffsetY(float y) {
+    void setOffset(float x, float y) {
+        offsetX = x;
         offsetY = y;
     }
 
@@ -237,7 +244,10 @@ public class MarkerView extends Marker {
     }
 
     /**
-     * Set the rotation value of the MarkerView.
+     * Set the rotation value of the MarkerView in degrees.
+     * <p>
+     * Input will be limited to 0 - 360 degrees
+     * </p>
      * <p>
      * This will result in animating the rotation of the MarkerView using an rotation animator
      * from current value to the provided parameter value.
@@ -246,9 +256,26 @@ public class MarkerView extends Marker {
      * @param rotation the rotation value to animate to
      */
     public void setRotation(float rotation) {
-        this.rotation = rotation;
+        // limit to 0 - 360 degrees
+        float newRotation = rotation;
+        while (newRotation > 360) {
+            newRotation -= 360;
+        }
+        while (newRotation < 0) {
+            newRotation += 360;
+        }
+
+        // calculate new direction
+        float diff = newRotation - this.rotation;
+        if (diff > 180.0f) {
+            diff -= 360.0f;
+        } else if (diff < -180.0f) {
+            diff += 360.f;
+        }
+
+        this.rotation = newRotation;
         if (markerViewManager != null) {
-            markerViewManager.animateRotation(this, rotation);
+            markerViewManager.animateRotationBy(this, diff);
         }
     }
 
@@ -279,7 +306,7 @@ public class MarkerView extends Marker {
      *
      * @param alpha the alpha value to animate to
      */
-    public void setAlpha(@FloatRange(from=0.0, to=255.0)float alpha) {
+    public void setAlpha(@FloatRange(from = 0.0, to = 255.0) float alpha) {
         this.alpha = alpha;
         if (markerViewManager != null) {
             markerViewManager.animateAlpha(this, alpha);
@@ -294,14 +321,22 @@ public class MarkerView extends Marker {
     @Override
     public void setIcon(@Nullable Icon icon) {
         if (icon != null) {
-            markerViewIcon = IconFactory.recreate("icon", icon.getBitmap());
+            markerViewIcon = IconFactory.recreate(IconFactory.ICON_MARKERVIEW_ID, icon.getBitmap());
         }
-        Bitmap bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
-        Icon transparentIcon = IconFactory.recreate("markerViewSettings", bitmap);
+        Icon transparentIcon = IconFactory.recreate(IconFactory.ICON_MARKERVIEW_ID,
+                IconFactory.ICON_MARKERVIEW_BITMAP);
         if (markerViewManager != null) {
             markerViewManager.updateIcon(this);
         }
         super.setIcon(transparentIcon);
+    }
+
+    @Override
+    public void setPosition(LatLng position) {
+        super.setPosition(position);
+        if (markerViewManager != null) {
+            markerViewManager.update();
+        }
     }
 
     public boolean isSelected() {
@@ -330,13 +365,23 @@ public class MarkerView extends Marker {
      * <p>
      * This method is used to instantiate the MarkerView and provide an instance of {@link com.mapbox.mapboxsdk.maps.MapboxMap.MarkerViewAdapter}
      * </p>
+     * <p>
+     * This method is used to notify that a MarkerView is no longer active by setting a null value.
+     * </p>
      *
      * @param mapboxMap the MapboxMap instances
      */
     @Override
     public void setMapboxMap(MapboxMap mapboxMap) {
         super.setMapboxMap(mapboxMap);
-        markerViewManager = mapboxMap.getMarkerViewManager();
+        if(mapboxMap!=null) {
+            if (isFlat()) {
+                // initial tilt value if MapboxMap is started with a tilt attribute
+                tiltValue = (float) mapboxMap.getCameraPosition().tilt;
+            }
+
+            markerViewManager = mapboxMap.getMarkerViewManager();
+        }
     }
 
     /**

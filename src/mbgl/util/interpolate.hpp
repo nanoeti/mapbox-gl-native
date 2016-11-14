@@ -5,6 +5,7 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <mbgl/util/color.hpp>
 
 namespace mbgl {
 namespace util {
@@ -41,10 +42,23 @@ public:
     }
 };
 
+template <>
+struct Interpolator<Color> {
+public:
+    Color operator()(const Color& a, const Color& b, const double t) {
+        return {
+            interpolate(a.r, b.r, t),
+            interpolate(a.g, b.g, t),
+            interpolate(a.b, b.b, t),
+            interpolate(a.a, b.a, t)
+        };
+    }
+};
+
 struct Uninterpolated {
     template <class T>
-    T operator()(const T&, const T& b, const double) const {
-        return b;
+    T operator()(const T& a, const T&, const double) const {
+        return a;
     }
 };
 
