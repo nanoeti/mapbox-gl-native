@@ -691,6 +691,7 @@ public class MyLocationView extends View {
                 animationDuration = (locationUpdateTimestamp - previousUpdateTimeStamp) * 1.1f /*make animation slightly longer*/;
             }
 
+
             // calculate interpolated location
             latLng = new LatLng(location);
             CameraPosition.Builder builder = new CameraPosition.Builder().target(latLng);
@@ -747,13 +748,16 @@ public class MyLocationView extends View {
             locationUpdateTimestamp = SystemClock.elapsedRealtime();
             long locationUpdateDuration = (long) ((locationUpdateTimestamp - previousUpdateTimeStamp) * 1.2f);
 
+            // Limit animation to 5 seconds
+            if (locationUpdateTimestamp > 5000) {
+                locationUpdateTimestamp = 5000;
+            }
+
             // animate changes
             if (locationChangeAnimator != null) {
                 locationChangeAnimator.end();
                 locationChangeAnimator = null;
             }
-
-            LatLng newLatLng = new LatLng(location);
 
             locationChangeAnimator = ValueAnimator.ofFloat(0.0f, 1.0f);
             locationChangeAnimator.setDuration(locationUpdateDuration);

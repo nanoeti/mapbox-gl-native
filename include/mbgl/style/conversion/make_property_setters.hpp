@@ -81,6 +81,9 @@ auto makePaintPropertySetters() {
     result["fill-translate"] = makePropertySetter<V>(&FillLayer::setFillTranslate);
     result["fill-translate-anchor"] = makePropertySetter<V>(&FillLayer::setFillTranslateAnchor);
     result["fill-pattern"] = makePropertySetter<V>(&FillLayer::setFillPattern);
+    // Simply skip currently unsupported "fill-extrude-height" property
+    result["fill-extrude-height"] = [] (Layer&, const V&, const optional<std::string>&) ->
+                                        optional<Error> {return {};};
 
     result["line-opacity"] = makePropertySetter<V>(&LineLayer::setLineOpacity);
     result["line-color"] = makePropertySetter<V>(&LineLayer::setLineColor);

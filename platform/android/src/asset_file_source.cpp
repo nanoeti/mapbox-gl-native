@@ -64,13 +64,13 @@ public:
 
         int ret = ::zip_stat(archive.archive, path.c_str(), 0, &stat);
         if (ret < 0 || !(stat.valid & ZIP_STAT_SIZE)) {
-            reportError(Response::Error::Reason::NotFound, "Could not stat file in zip archive", callback);
+            reportError(Response::Error::Reason::NotFound, ("Could not stat file in zip archive: " + path).c_str(), callback);
             return;
         }
 
         ZipFileHolder file = ::zip_fopen(archive.archive, path.c_str(), 0);
         if (!file.file) {
-            reportError(Response::Error::Reason::NotFound, "Could not open file in zip archive", callback);
+            reportError(Response::Error::Reason::NotFound, ("Could not open file in zip archive: " + path).c_str(), callback);
             return;
         }
 
@@ -97,6 +97,7 @@ public:
 private:
     std::string root;
 };
+
 
 AssetFileSource::AssetFileSource(const std::string& root)
     : thread(std::make_unique<util::Thread<Impl>>(
